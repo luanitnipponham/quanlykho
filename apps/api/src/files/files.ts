@@ -32,6 +32,39 @@ import {
 /** Absolute root of the document tree; override with STORAGE_DIR. */
 export const STORAGE_DIR = process.env.STORAGE_DIR || path.resolve(process.cwd(), 'storage');
 
+/** Xóa thư mục nếu đã rỗng; không bao giờ đi lên quá gốc CHUNG_TU. */
+function pruneIfEmpty(dir: string): void {
+  const root = path.join(STORAGE_DIR, STORAGE_ROOT);
+  if (dir === root || !dir.startsWith(root + path.sep)) return;
+  try {
+    if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+  } catch {
+    // Thư mục đang bận hoặc đã biến mất — không đáng để làm hỏng thao tác xóa phiếu.
+  }
+}
+
+/**
+ * Xóa file vật lý của các đính kèm rồi dọn thư mục mã phiếu và thư mục ngày nếu rỗng.
+ * Xóa phiếu chỉ xóa hàng trong CSDL (cascade), nên nếu không gọi hàm này thì file
+ * ở lại trong CHUNG_TU mãi mãi mà không còn gì trỏ tới.
+ */
+export function removeStoredFiles(storagePaths: string[]): void {
+  const dirs = new Set<string>();
+  for (const p of storagePaths) {
+    const abs = path.join(STORAGE_DIR, p.replace(/^\//, ''));
+    try {
+      fs.rmSync(abs, { force: true });
+    } catch {
+      // File đã mất từ trước thì coi như xong việc.
+    }
+    dirs.add(path.dirname(abs));
+  }
+  for (const dir of dirs) {
+    pruneIfEmpty(dir); // thư mục mã phiếu
+    pruneIfEmpty(path.dirname(dir)); // thư mục ngày
+  }
+}
+
 @Injectable()
 export class FilesService {
   constructor(private readonly prisma: PrismaService) {}

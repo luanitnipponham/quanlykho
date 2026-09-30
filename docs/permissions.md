@@ -61,6 +61,20 @@ Mỗi transition đi qua đủ các bước sau **trong cùng transaction**:
 1. Phiếu tồn tại.
 2. `status` hiện tại nằm trong danh sách `ACTION_FROM[action]` → nếu không: `ERR_INVALID_TRANSITION`.
    Riêng Admin được bỏ qua bước này với `EDIT_DRAFT`, `TRANSFER`, `FORCE`, `ADMIN_CANCEL`, `DELETE`, `COMMENT`.
+
+### Xóa phiếu (A3) là xóa vĩnh viễn
+
+`DELETE /payment-requests/:id` xóa **thật** khỏi PostgreSQL, không phải đánh dấu ẩn. Khóa
+ngoại khai báo `onDelete: Cascade` nên cuốn theo toàn bộ đính kèm, lịch sử luân chuyển,
+giao dịch chi, bình luận và thông báo của phiếu. Sau đó máy chủ xóa nốt file vật lý trong
+`CHUNG_TU` và dọn thư mục mã phiếu cùng thư mục ngày nếu đã rỗng.
+
+File chỉ bị xóa **sau khi** transaction cam kết thành công. Làm ngược lại thì một lần
+rollback sẽ để lại phiếu còn nguyên trong CSDL nhưng chứng từ đã mất vĩnh viễn.
+
+Không khôi phục được. Chỉ còn lại dòng ghi trong nhật ký (kèm lý do và số file đã xóa),
+và nhật ký cũng chỉ giữ 6 ngày. Muốn lấy lại phải khôi phục từ bản sao lưu —
+xem [deploy.md §5](deploy.md).
 3. Vai trò có quyền với hành động → nếu không: `ERR_FORBIDDEN`. Admin đi thẳng qua.
 4. Phạm vi dữ liệu:
    - B1, B3, B6, B8: `assignedRequesterId = me`.

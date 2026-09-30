@@ -3,6 +3,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { removeStoredFiles } from '../files/files';
 import {
   ACTION_FROM,
   type ActionKey,
@@ -504,13 +505,33 @@ export class RequestsService {
     return { message: `Đã chuyển giao ${dto.items.length} phiếu cho ${target.fullName}` };
   }
 
-  remove(actor: Actor, id: string, dto: ReasonDto) {
-    return this.tx(actor, id, dto.version, 'DELETE', async (tx, pr) => {
+  async remove(actor: Actor, id: string, dto: ReasonDto) {
+    // Đọc trước khi xóa: cascade sẽ cuốn sạch hàng attachment nên sau transaction
+    // không còn cách nào tra ra file nào thuộc phiếu này.
+    const paths = (
+      await this.prisma.attachment.findMany({ where: { requestId: id }, select: { storagePath: true } })
+    ).map((a) => a.storagePath);
+
+    const result = await this.tx(actor, id, dto.version, 'DELETE', async (tx, pr) => {
       const reason = requireReason(dto.reason, 'lý do xóa');
+      // Xóa thật khỏi PostgreSQL. Cascade dọn luôn đính kèm, lịch sử, giao dịch,
+      // bình luận và thông báo của phiếu (schema.prisma: onDelete Cascade).
       await tx.paymentRequest.delete({ where: { id } });
-      await this.audit(tx, actor.id, 'DELETE', 'payment_request', id, `Xóa phiếu ${pr.code} – ${reason}`);
+      await this.audit(
+        tx,
+        actor.id,
+        'DELETE',
+        'payment_request',
+        id,
+        `Xóa phiếu ${pr.code} – ${reason} (kèm ${paths.length} file đính kèm)`,
+      );
       return { message: `Đã xóa phiếu ${pr.code}` };
     });
+
+    // Chỉ đụng tới ổ đĩa sau khi transaction chắc chắn thành công. Xóa file trước
+    // mà transaction rollback thì phiếu còn nguyên nhưng chứng từ đã mất vĩnh viễn.
+    removeStoredFiles(paths);
+    return result;
   }
 
   // -------------------------------------------------------------------------
