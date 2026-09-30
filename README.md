@@ -49,6 +49,12 @@ docker compose up -d --build
 Mở `http://<địa-chỉ-máy-chủ>/`. Chỉ container `web` mở cổng ra ngoài;
 API và PostgreSQL nằm trong mạng nội bộ của compose.
 
+Sao lưu database và tệp đính kèm sang NAS:
+
+```bash
+sudo bash deploy/backup.sh --install-cron   # cài lịch chạy hằng ngày
+```
+
 Cập nhật lên phiên bản mới về sau — cùng một script, chạy lại là xong:
 
 ```bash

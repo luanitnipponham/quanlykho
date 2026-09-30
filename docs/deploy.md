@@ -239,7 +239,58 @@ echo "<GitHub token co quyen read:packages>" | docker login ghcr.io -u luanitnip
 
 ## 5. Sao lưu và khôi phục
 
-Sao lưu cả hai thứ — chỉ một trong hai là không đủ.
+Sao lưu cả hai thứ — chỉ một trong hai là không đủ. Tệp đính kèm không có database
+đi kèm thì không biết tệp nào thuộc phiếu nào.
+
+### Cách nhanh: một lệnh
+
+[`deploy/backup.sh`](../deploy/backup.sh) làm cả hai — `pg_dump` nén gzip và `rsync` cây
+`CHUNG_TU` — vào cùng một nơi, mặc định `/mnt/nas`:
+
+```bash
+sudo bash deploy/backup.sh                      # chạy ngay một lần
+sudo bash deploy/backup.sh --install-cron       # cài lịch 01:00 hằng ngày
+```
+
+Kết quả nằm ở `/mnt/nas/quanlykho/`:
+
+```
+quanlykho/
+├── db/db-2026-09-30.sql.gz
+└── CHUNG_TU/{CUNG_UNG,KE_TOAN}/<ngày>/<mã phiếu>/<tệp>
+```
+
+| Biến | Tác dụng |
+| :-- | :-- |
+| `BACKUP_DIR=/mnt/nas` | Nơi cất bản sao |
+| `KEEP_DAYS=14` | Giữ bao nhiêu ngày bản dump database |
+| `ALLOW_LOCAL=true` | Cho phép ghi vào thư mục không phải điểm gắn mạng |
+
+Script **dừng lại nếu `BACKUP_DIR` không phải điểm gắn (mount point)**. Khi NAS chưa được
+gắn, đường dẫn đó chỉ là thư mục rỗng trên đĩa cục bộ — bản sao sẽ âm thầm ghi vào chính
+máy chủ và mất luôn tác dụng khi máy đó hỏng. Bản dump cũng chỉ được đổi sang tên chính
+thức sau khi `gzip -t` xác nhận hợp lệ, nên mất điện giữa chừng không phá bản cũ.
+
+`rsync` cố ý **không** dùng `--delete`: nếu ai đó lỡ xóa tệp trong ứng dụng, bản sao vẫn còn.
+
+### Gắn NAS
+
+```bash
+sudo apt install -y cifs-utils
+sudo mkdir -p /mnt/nas
+sudo tee /etc/nas-credentials > /dev/null <<'EOF'
+username=TEN_DANG_NHAP_NAS
+password=MAT_KHAU_NAS
+EOF
+sudo chmod 600 /etc/nas-credentials
+echo '//192.168.4.XX/ten_share /mnt/nas cifs credentials=/etc/nas-credentials,uid=1000,gid=1000,vers=3.0,nofail,_netdev 0 0' | sudo tee -a /etc/fstab
+sudo mount -a
+```
+
+Mật khẩu để trong file riêng `chmod 600`, không để thẳng trong `/etc/fstab` vì file đó ai
+cũng đọc được. `nofail` để máy chủ vẫn khởi động bình thường khi NAS tắt.
+
+### Làm thủ công
 
 ```bash
 # Sao lưu cơ sở dữ liệu
