@@ -78,11 +78,11 @@ else
   ok "Bo nho: ${MEM_MB} MB RAM + ${SWAP_MB} MB swap"
 fi
 
-DISK_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+DISK_MB=$(df -BM --output=avail / | tail -1 | tr -dc '0-9')
 # Build tai cho ton dia hon nhieu: npm ci, ma nguon trung gian va bo nho dem cua buildx.
 # Keo image dung san thi chi can cho ba image cong du lieu.
-if [ "${PREBUILT:-}" = "true" ]; then NEED_GB=3; else NEED_GB=5; fi
-if [ "${DISK_GB:-0}" -lt "$NEED_GB" ]; then
+if [ "${PREBUILT:-}" = "true" ]; then NEED_MB=3072; else NEED_MB=5120; fi
+if [ "${DISK_MB:-0}" -lt "$NEED_MB" ]; then
   echo
   df -h / || true
   echo
@@ -90,10 +90,12 @@ if [ "${DISK_GB:-0}" -lt "$NEED_GB" ]; then
   warn "    sudo vgs                                            (xem cot VFree)"
   warn "    sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv"
   warn "    sudo resize2fs /dev/ubuntu-vg/ubuntu-lv"
-  warn "Hoac don bot:  sudo apt clean && sudo apt autoremove --purge -y && sudo journalctl --vacuum-size=100M"
-  die "Chi con ${DISK_GB} GB trong tren /. Che do nay can toi thieu ${NEED_GB} GB."
+  warn "Neu VFree = 0 thi o da cap het — phai don bot hoac noi rong o ao:"
+  warn "    sudo apt clean && sudo apt autoremove --purge -y && sudo journalctl --vacuum-size=100M"
+  warn "    docker system df          (xem Docker dang chiem bao nhieu)"
+  die "Chi con ${DISK_MB} MB trong tren /. Che do nay can toi thieu $((NEED_MB / 1024)) GB."
 fi
-ok "Dia trong: ${DISK_GB} GB (can ${NEED_GB} GB)"
+ok "Dia trong: ${DISK_MB} MB (can $((NEED_MB / 1024)) GB)"
 
 # ---------------------------------------------------------------------------
 step "2/7  Cai Docker"
