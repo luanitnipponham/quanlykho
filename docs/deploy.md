@@ -176,10 +176,28 @@ Sau khi đăng nhập lần đầu, hệ thống bắt đổi mật khẩu. Nên
 | Khởi động lại | `docker compose restart api` |
 | Tắt (giữ dữ liệu) | `docker compose down` |
 | Bật lại | `docker compose up -d` |
-| Cập nhật mã nguồn mới | `git pull && docker compose up -d --build` |
+| Cập nhật mã nguồn mới | `sudo bash deploy/update.sh` |
 | Vào psql | `docker compose exec db psql -U quanlykho -d quanlykho` |
 
 > `docker compose down -v` **xóa cả volume** — mất toàn bộ dữ liệu và file đính kèm. Chỉ dùng khi thật sự muốn làm lại từ đầu.
+
+---
+
+### Cập nhật bằng một lệnh
+
+[`deploy/update.sh`](../deploy/update.sh) kéo code mới, build và kích hoạt bản mới, chờ tới
+khi hệ thống trả lời đúng, rồi dọn image mồ côi và bộ nhớ đệm build cũ hơn 3 ngày:
+
+```bash
+cd /opt/quanlykho && sudo bash deploy/update.sh
+```
+
+Dữ liệu không bị đụng tới — volume `db-data`, `storage` và file `deploy/app.env` giữ nguyên.
+Migration mới (nếu có) tự chạy trong entrypoint trước khi API khởi động. Nếu bản mới lỗi,
+script in sẵn lệnh quay về bản trước.
+
+Script dừng lại nếu thư mục làm việc có thay đổi chưa commit, và dùng `git pull --ff-only`
+nên không bao giờ tự động merge trên máy chủ.
 
 ---
 

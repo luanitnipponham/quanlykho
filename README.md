@@ -49,6 +49,12 @@ docker compose up -d --build
 Mở `http://<địa-chỉ-máy-chủ>/`. Chỉ container `web` mở cổng ra ngoài;
 API và PostgreSQL nằm trong mạng nội bộ của compose.
 
+Cập nhật lên phiên bản mới về sau — kéo code, build lại, dọn bộ nhớ đệm:
+
+```bash
+cd /opt/quanlykho && sudo bash deploy/update.sh
+```
+
 Hướng dẫn triển khai Linux chi tiết: [`docs/deploy.md`](docs/deploy.md).
 
 ## 4. Chạy trực tiếp khi phát triển
