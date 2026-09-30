@@ -102,10 +102,24 @@ Script tự gọi `sudo` nếu cần, nên không phải gõ `sudo ./deploy.sh`.
 | Biến | Tác dụng |
 | :-- | :-- |
 | `PREBUILT=true` | Kéo image dựng sẵn trên GHCR thay vì build tại chỗ — khoảng 30 giây, không cần RAM để biên dịch |
-| `HTTP_PORT=8080` | Đổi cổng phía ngoài |
+| `HTTP_PORT=8080` | Đổi cổng phía ngoài cho lần chạy này |
 | `SEED_DEMO=true` | Nạp thêm danh mục và phiếu mẫu |
 | `NO_GIT=true` | Không đồng bộ mã nguồn, chỉ dựng lại |
 | `NO_PRUNE=true` | Không dọn bộ nhớ đệm |
+
+#### Đổi cổng cố định
+
+Nếu máy chủ còn chạy web khác chiếm cổng 80, đặt cổng một lần trong file `.env` ở gốc dự án —
+đây chính là file `docker compose` tự đọc, nên mọi lệnh về sau đều dùng đúng cổng đó:
+
+```bash
+cd /opt/quanlykho
+echo 'HTTP_PORT=8080' > .env
+./deploy.sh
+```
+
+Địa chỉ khi đó là `http://<IP máy chủ>:8080`. Nhớ sửa `CORS_ORIGIN` trong `deploy/app.env`
+cho khớp. `.env` nằm trong `.gitignore` nên `git reset --hard` không xoá mất.
 
 Chạy lại nhiều lần vẫn an toàn: script **không** ghi đè `deploy/app.env` đã có, vì đổi mật
 khẩu trong đó sẽ khiến API không mở được database cũ. Bước đồng bộ dùng `git reset --hard`

@@ -15,7 +15,7 @@
 #
 # Bien moi truong tuy chon:
 #   PREBUILT=true    keo image dung san tren GHCR thay vi build tai cho (nhanh hon nhieu)
-#   HTTP_PORT=8080   cong phia ngoai (mac dinh 80)
+#   HTTP_PORT=8080   cong phia ngoai (mac dinh 80; hoac dat co dinh trong file .env)
 #   REPO_DIR=/srv/x  noi dat ma nguon (mac dinh /opt/quanlykho)
 #   NO_GIT=true      bo qua buoc dong bo ma nguon
 #   NO_PRUNE=true    bo qua buoc don bo nho dem
@@ -24,7 +24,9 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/luanitnipponham/quanlykho.git"
-HTTP_PORT="${HTTP_PORT:-80}"
+# Gia tri nguoi dung truyen vao dong lenh; neu khong co thi lat sau se doc tu .env
+# cua du an (chinh file ma docker compose doc), roi moi lay mac dinh 80.
+HTTP_PORT_ARG="${HTTP_PORT:-}"
 
 RED=$'\033[31m'
 GREEN=$'\033[32m'
@@ -147,6 +149,13 @@ else
   fi
 fi
 cd "$REPO_DIR"
+
+# docker compose tu doc file .env cua du an. Neu chi dat HTTP_PORT o do ma script
+# lai mac dinh 80 thi buoc kiem tra cuoi se do nham cong va bao that bai oan.
+if [ -z "$HTTP_PORT_ARG" ] && [ -f .env ]; then
+  HTTP_PORT_ENV=$(grep -E '^HTTP_PORT=' .env | tail -1 | cut -d= -f2- | tr -dc '0-9')
+fi
+HTTP_PORT="${HTTP_PORT_ARG:-${HTTP_PORT_ENV:-80}}"
 
 if [ "${NO_GIT:-}" = "true" ] || [ ! -d .git ]; then
   ok "Bo qua dong bo ma nguon"
