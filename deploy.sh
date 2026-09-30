@@ -79,8 +79,21 @@ else
 fi
 
 DISK_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
-[ "${DISK_GB:-0}" -ge 5 ] || die "Chi con ${DISK_GB} GB trong tren /. Can toi thieu 5 GB."
-ok "Dia trong: ${DISK_GB} GB"
+# Build tai cho ton dia hon nhieu: npm ci, ma nguon trung gian va bo nho dem cua buildx.
+# Keo image dung san thi chi can cho ba image cong du lieu.
+if [ "${PREBUILT:-}" = "true" ]; then NEED_GB=3; else NEED_GB=5; fi
+if [ "${DISK_GB:-0}" -lt "$NEED_GB" ]; then
+  echo
+  df -h / || true
+  echo
+  warn "Ubuntu cai mac dinh thuong chi cap mot phan o cho LVM. Kiem tra phan con trong:"
+  warn "    sudo vgs                                            (xem cot VFree)"
+  warn "    sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv"
+  warn "    sudo resize2fs /dev/ubuntu-vg/ubuntu-lv"
+  warn "Hoac don bot:  sudo apt clean && sudo apt autoremove --purge -y && sudo journalctl --vacuum-size=100M"
+  die "Chi con ${DISK_GB} GB trong tren /. Che do nay can toi thieu ${NEED_GB} GB."
+fi
+ok "Dia trong: ${DISK_GB} GB (can ${NEED_GB} GB)"
 
 # ---------------------------------------------------------------------------
 step "2/7  Cai Docker"
