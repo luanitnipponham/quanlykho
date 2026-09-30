@@ -35,8 +35,8 @@ Máy trạng thái nằm trong `src/domain/` và được nhân bản ở `apps/
 Một lệnh trên máy chủ Linux trắng — tự cài Docker, sinh mật khẩu, dựng và kiểm tra:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/luanitnipponham/quanlykho/main/deploy/install.sh -o install.sh
-sudo bash install.sh
+curl -fsSL https://raw.githubusercontent.com/luanitnipponham/quanlykho/main/deploy.sh -o deploy.sh
+sudo bash deploy.sh
 ```
 
 Hoặc làm thủ công nếu đã có Docker:
@@ -49,11 +49,15 @@ docker compose up -d --build
 Mở `http://<địa-chỉ-máy-chủ>/`. Chỉ container `web` mở cổng ra ngoài;
 API và PostgreSQL nằm trong mạng nội bộ của compose.
 
-Cập nhật lên phiên bản mới về sau — kéo code, build lại, dọn bộ nhớ đệm:
+Cập nhật lên phiên bản mới về sau — cùng một script, chạy lại là xong:
 
 ```bash
-cd /opt/quanlykho && sudo bash deploy/update.sh
+cd /opt/quanlykho
+git fetch origin main && git reset --hard origin/main
+./deploy.sh
 ```
+
+Muốn máy chủ khỏi phải build, kéo image dựng sẵn trên GHCR: `PREBUILT=true ./deploy.sh`
 
 Hướng dẫn triển khai Linux chi tiết: [`docs/deploy.md`](docs/deploy.md).
 

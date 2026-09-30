@@ -78,19 +78,39 @@ newgrp docker
 
 ### Cách nhanh: một lệnh
 
-[`deploy/install.sh`](../deploy/install.sh) làm trọn bộ — kiểm tra máy chủ và tạo swap nếu
-thiếu RAM, cài Docker nếu chưa có, tải mã nguồn, sinh `POSTGRES_PASSWORD` và `JWT_SECRET`
-ngẫu nhiên (đảm bảo khớp giữa `DATABASE_URL` và `POSTGRES_PASSWORD`), mở tường lửa, dựng
-container rồi chờ tới khi giao diện trả 200 và API trả 401:
+[`deploy.sh`](../deploy.sh) làm trọn bộ — kiểm tra máy chủ và tạo swap nếu thiếu RAM, cài
+Docker nếu chưa có, đồng bộ mã nguồn, sinh `POSTGRES_PASSWORD` và `JWT_SECRET` ngẫu nhiên
+(đảm bảo khớp giữa `DATABASE_URL` và `POSTGRES_PASSWORD`), mở tường lửa, dựng container,
+chờ tới khi giao diện trả 200 và API trả 401, rồi dọn bộ nhớ đệm:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/luanitnipponham/quanlykho/main/deploy/install.sh -o install.sh
-less install.sh          # nên đọc trước khi chạy bằng quyền root
-sudo bash install.sh
+curl -fsSL https://raw.githubusercontent.com/luanitnipponham/quanlykho/main/deploy.sh -o deploy.sh
+less deploy.sh           # nên đọc trước khi chạy bằng quyền root
+sudo bash deploy.sh
 ```
 
-Tùy chọn: `sudo HTTP_PORT=8080 bash install.sh` để đổi cổng, `SEED_DEMO=true` để nạp thêm
-dữ liệu mẫu. Chạy lại nhiều lần vẫn an toàn — script không ghi đè `deploy/app.env` đã có.
+Cùng script đó dùng cho mọi lần cập nhật về sau:
+
+```bash
+cd /opt/quanlykho
+git fetch origin main && git reset --hard origin/main
+./deploy.sh
+```
+
+Script tự gọi `sudo` nếu cần, nên không phải gõ `sudo ./deploy.sh`.
+
+| Biến | Tác dụng |
+| :-- | :-- |
+| `PREBUILT=true` | Kéo image dựng sẵn trên GHCR thay vì build tại chỗ — khoảng 30 giây, không cần RAM để biên dịch |
+| `HTTP_PORT=8080` | Đổi cổng phía ngoài |
+| `SEED_DEMO=true` | Nạp thêm danh mục và phiếu mẫu |
+| `NO_GIT=true` | Không đồng bộ mã nguồn, chỉ dựng lại |
+| `NO_PRUNE=true` | Không dọn bộ nhớ đệm |
+
+Chạy lại nhiều lần vẫn an toàn: script **không** ghi đè `deploy/app.env` đã có, vì đổi mật
+khẩu trong đó sẽ khiến API không mở được database cũ. Bước đồng bộ dùng `git reset --hard`
+nên mọi sửa đổi tại chỗ trong file đã theo dõi sẽ mất — nhưng `deploy/app.env` và các volume
+dữ liệu không bị đụng tới vì chúng không nằm trong Git.
 
 ### Cách thủ công, từng bước
 
@@ -176,28 +196,30 @@ Sau khi đăng nhập lần đầu, hệ thống bắt đổi mật khẩu. Nên
 | Khởi động lại | `docker compose restart api` |
 | Tắt (giữ dữ liệu) | `docker compose down` |
 | Bật lại | `docker compose up -d` |
-| Cập nhật mã nguồn mới | `sudo bash deploy/update.sh` |
+| Cập nhật mã nguồn mới | `git fetch origin main && git reset --hard origin/main && ./deploy.sh` |
 | Vào psql | `docker compose exec db psql -U quanlykho -d quanlykho` |
 
 > `docker compose down -v` **xóa cả volume** — mất toàn bộ dữ liệu và file đính kèm. Chỉ dùng khi thật sự muốn làm lại từ đầu.
 
 ---
 
-### Cập nhật bằng một lệnh
+### Chạy bằng image dựng sẵn (không build trên máy chủ)
 
-[`deploy/update.sh`](../deploy/update.sh) kéo code mới, build và kích hoạt bản mới, chờ tới
-khi hệ thống trả lời đúng, rồi dọn image mồ côi và bộ nhớ đệm build cũ hơn 3 ngày:
+[`.github/workflows/publish-images.yml`](../.github/workflows/publish-images.yml) dựng sẵn hai
+image mỗi lần đẩy lên nhánh `main` và đẩy lên GitHub Container Registry. Máy chủ chỉ kéo về:
 
 ```bash
-cd /opt/quanlykho && sudo bash deploy/update.sh
+PREBUILT=true ./deploy.sh
 ```
 
-Dữ liệu không bị đụng tới — volume `db-data`, `storage` và file `deploy/app.env` giữ nguyên.
-Migration mới (nếu có) tự chạy trong entrypoint trước khi API khởi động. Nếu bản mới lỗi,
-script in sẵn lệnh quay về bản trước.
+Mất khoảng 30 giây thay vì 5–15 phút, và không cần RAM để biên dịch argon2 — hợp với máy chủ nhỏ.
 
-Script dừng lại nếu thư mục làm việc có thay đổi chưa commit, và dùng `git pull --ff-only`
-nên không bao giờ tự động merge trên máy chủ.
+Sau lần chạy workflow đầu tiên, vào trang **Packages** của repo, mở từng package rồi
+**Package settings → Change visibility → Public**. Nếu để Private, máy chủ phải đăng nhập trước:
+
+```bash
+echo "<GitHub token co quyen read:packages>" | docker login ghcr.io -u luanitnipponham --password-stdin
+```
 
 ---
 

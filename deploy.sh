@@ -1,25 +1,29 @@
 #!/usr/bin/env bash
 #
-# Cài đặt trọn gói HỆ THỐNG PHIẾU YÊU CẦU CHI trên Linux — chạy một lệnh là xong.
+# HE THONG PHIEU YEU CAU CHI — trien khai va cap nhat bang MOT lenh.
 #
-#   curl -fsSL https://raw.githubusercontent.com/luanitnipponham/quanlykho/main/deploy/install.sh -o install.sh
-#   sudo bash install.sh
+#   git fetch origin main && git reset --hard origin/main
+#   ./deploy.sh
 #
-# Script này: cài Docker nếu chưa có → tải mã nguồn → sinh mật khẩu và JWT_SECRET
-# ngẫu nhiên → dựng 3 container → chờ khỏe mạnh → kiểm tra rồi in tài khoản đăng nhập.
+# Dung duoc ca cho lan dau tren may chu trang lan cho moi lan cap nhat ve sau.
+# Script tu lam: cai Docker neu chua co -> dong bo ma nguon -> sinh mat khau va
+# JWT_SECRET neu chua co -> build va kich hoat -> cho khoe manh -> don bo nho dem.
 #
-# Chạy lại nhiều lần vẫn an toàn: KHÔNG bao giờ ghi đè deploy/app.env đã có, vì đổi
-# mật khẩu trong đó sẽ khiến API không mở được database cũ.
+# Lan dau tren may chu trang, neu chua co ma nguon:
+#   curl -fsSL https://raw.githubusercontent.com/luanitnipponham/quanlykho/main/deploy.sh -o deploy.sh
+#   sudo bash deploy.sh
 #
-# Biến môi trường tùy chọn:
-#   HTTP_PORT=8080    cổng phía ngoài (mặc định 80)
-#   REPO_DIR=/srv/x   nơi đặt mã nguồn (mặc định /opt/quanlykho)
-#   SEED_DEMO=true    nạp thêm danh mục và phiếu mẫu để xem thử
+# Bien moi truong tuy chon:
+#   PREBUILT=true    keo image dung san tren GHCR thay vi build tai cho (nhanh hon nhieu)
+#   HTTP_PORT=8080   cong phia ngoai (mac dinh 80)
+#   REPO_DIR=/srv/x  noi dat ma nguon (mac dinh /opt/quanlykho)
+#   NO_GIT=true      bo qua buoc dong bo ma nguon
+#   NO_PRUNE=true    bo qua buoc don bo nho dem
+#   SEED_DEMO=true   nap them danh muc va phieu mau de xem thu
 
 set -euo pipefail
 
 REPO_URL="https://github.com/luanitnipponham/quanlykho.git"
-REPO_DIR="${REPO_DIR:-/opt/quanlykho}"
 HTTP_PORT="${HTTP_PORT:-80}"
 
 RED=$'\033[31m'
@@ -33,7 +37,20 @@ ok()   { printf '    %s[ok]%s %s\n' "$GREEN" "$OFF" "$1"; }
 warn() { printf '    %s[!]%s  %s\n' "$YELLOW" "$OFF" "$1"; }
 die()  { printf '\n%sLOI:%s %s\n' "$RED" "$OFF" "$1" >&2; exit 1; }
 
-[ "$(id -u)" -eq 0 ] || die "Can quyen root. Chay lai bang:  sudo bash $0"
+# Docker can quyen root. Tu nang quyen de nguoi dung chi phai go "./deploy.sh".
+# -E giu lai cac bien tuy chon o tren.
+if [ "$(id -u)" -ne 0 ]; then
+  command -v sudo >/dev/null 2>&1 || die "Can quyen root nhung khong co sudo. Dang nhap bang root roi chay lai."
+  printf '%s==> Can quyen root, dang goi sudo...%s\n' "$BOLD" "$OFF"
+  exec sudo -E bash "$0" "$@"
+fi
+
+install_pkg() {
+  if   command -v apt-get >/dev/null 2>&1; then apt-get update -qq && apt-get install -y -qq "$@"
+  elif command -v dnf     >/dev/null 2>&1; then dnf install -y "$@"
+  elif command -v yum     >/dev/null 2>&1; then yum install -y "$@"
+  else return 1; fi
+}
 
 # ---------------------------------------------------------------------------
 step "1/7  Kiem tra may chu"
@@ -41,13 +58,11 @@ step "1/7  Kiem tra may chu"
 if [ -r /etc/os-release ]; then
   . /etc/os-release
   ok "${PRETTY_NAME:-Linux} ($(uname -m))"
-else
-  warn "Khong doc duoc /etc/os-release"
 fi
 
 MEM_MB=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
 SWAP_MB=$(awk '/SwapTotal/ {print int($2/1024)}' /proc/meminfo)
-if [ "$((MEM_MB + SWAP_MB))" -lt 1900 ]; then
+if [ "$((MEM_MB + SWAP_MB))" -lt 1900 ] && [ "${PREBUILT:-}" != "true" ]; then
   warn "Chi co ${MEM_MB} MB RAM + ${SWAP_MB} MB swap; buoc build can khoang 2 GB."
   if [ ! -f /swapfile ]; then
     fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
@@ -64,24 +79,12 @@ else
 fi
 
 DISK_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
-[ "${DISK_GB:-0}" -ge 8 ] || die "Chi con ${DISK_GB} GB trong tren /. Can toi thieu 8 GB."
+[ "${DISK_GB:-0}" -ge 5 ] || die "Chi con ${DISK_GB} GB trong tren /. Can toi thieu 5 GB."
 ok "Dia trong: ${DISK_GB} GB"
 
 # ---------------------------------------------------------------------------
 step "2/7  Cai Docker"
 # ---------------------------------------------------------------------------
-install_pkg() {
-  if command -v apt-get >/dev/null 2>&1; then
-    apt-get update -qq && apt-get install -y -qq "$@"
-  elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y "$@"
-  elif command -v yum >/dev/null 2>&1; then
-    yum install -y "$@"
-  else
-    return 1
-  fi
-}
-
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   ok "Da co $(docker --version | cut -d, -f1)"
 else
@@ -99,37 +102,62 @@ systemctl enable --now docker >/dev/null 2>&1 || true
 docker info >/dev/null 2>&1 || die "Docker daemon khong chay. Kiem tra: systemctl status docker"
 ok "Docker daemon dang chay"
 
-# Nguoi goi sudo duoc them vao nhom docker, co hieu luc tu lan dang nhap sau.
 REAL_USER="${SUDO_USER:-}"
 if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
   if ! id -nG "$REAL_USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
     usermod -aG docker "$REAL_USER" 2>/dev/null \
-      && warn "Da them '$REAL_USER' vao nhom docker — dang xuat roi vao lai de dung docker khong can sudo."
+      && warn "Da them '$REAL_USER' vao nhom docker — co hieu luc tu lan dang nhap sau."
   fi
 fi
 
 # ---------------------------------------------------------------------------
-step "3/7  Tai ma nguon"
+step "3/7  Ma nguon"
 # ---------------------------------------------------------------------------
 SELF_DIR=""
 if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
   SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 fi
 
-if [ -n "$SELF_DIR" ] && [ -f "$SELF_DIR/../docker-compose.yml" ]; then
+if [ -n "$SELF_DIR" ] && [ -f "$SELF_DIR/docker-compose.yml" ]; then
   # Script dang nam trong ban sao da clone — dung luon cho do.
-  REPO_DIR=$(cd "$SELF_DIR/.." && pwd)
-  ok "Dung ma nguon san co tai $REPO_DIR"
-elif [ -f "$REPO_DIR/docker-compose.yml" ]; then
-  ok "Da co ma nguon tai $REPO_DIR"
+  REPO_DIR="$SELF_DIR"
 else
-  command -v git >/dev/null 2>&1 || install_pkg git || die "Khong cai duoc git."
-  mkdir -p "$(dirname "$REPO_DIR")"
-  git clone --depth 1 "$REPO_URL" "$REPO_DIR"
-  if [ -n "$REAL_USER" ]; then chown -R "$REAL_USER:$REAL_USER" "$REPO_DIR" || true; fi
-  ok "Da tai ve $REPO_DIR"
+  REPO_DIR="${REPO_DIR:-/opt/quanlykho}"
+  if [ ! -f "$REPO_DIR/docker-compose.yml" ]; then
+    command -v git >/dev/null 2>&1 || install_pkg git || die "Khong cai duoc git."
+    mkdir -p "$(dirname "$REPO_DIR")"
+    git clone "$REPO_URL" "$REPO_DIR"
+    [ -n "$REAL_USER" ] && chown -R "$REAL_USER:$REAL_USER" "$REPO_DIR" || true
+    ok "Da tai ve $REPO_DIR"
+  fi
 fi
 cd "$REPO_DIR"
+
+if [ "${NO_GIT:-}" = "true" ] || [ ! -d .git ]; then
+  ok "Bo qua dong bo ma nguon"
+else
+  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)
+  [ "$BRANCH" != "HEAD" ] || BRANCH=main
+  BEFORE=$(git rev-parse --short HEAD 2>/dev/null || echo '?')
+  git fetch --prune origin "$BRANCH"
+  # Khop chinh xac voi ban tren GitHub. Khong dung toi file chua theo doi nen
+  # deploy/app.env va cac volume du lieu van nguyen ven.
+  git reset --hard "origin/$BRANCH"
+  AFTER=$(git rev-parse --short HEAD)
+  if [ "$BEFORE" = "$AFTER" ]; then
+    ok "Da la ban moi nhat ($AFTER)"
+  else
+    ok "Cap nhat $BEFORE -> $AFTER"
+    git --no-pager log --oneline "$BEFORE..$AFTER" 2>/dev/null | head -10 | sed 's/^/      /' || true
+  fi
+fi
+
+if [ "${PREBUILT:-}" = "true" ]; then
+  [ -f docker-compose.prod.yml ] || die "Khong thay docker-compose.prod.yml"
+  COMPOSE=(docker compose -f docker-compose.prod.yml)
+else
+  COMPOSE=(docker compose)
+fi
 
 # ---------------------------------------------------------------------------
 step "4/7  Cau hinh"
@@ -146,6 +174,8 @@ else
   if [ "$HTTP_PORT" = "80" ]; then ORIGIN="http://$IP"; else ORIGIN="http://$IP:$HTTP_PORT"; fi
 
   cp deploy/app.env.example deploy/app.env
+  # Sinh tu mot bien duy nhat nen mat khau luon khop giua hai dong —
+  # day la loi hay gap nhat khi sua bang tay.
   sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$PW|" deploy/app.env
   sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://quanlykho:$PW@db:5432/quanlykho?schema=public|" deploy/app.env
   sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT|" deploy/app.env
@@ -173,16 +203,23 @@ elif command -v firewall-cmd >/dev/null 2>&1; then
   firewall-cmd --permanent --add-port="${HTTP_PORT}/tcp" >/dev/null 2>&1 || true
   firewall-cmd --reload >/dev/null 2>&1 || true
   ok "Da mo cong ${HTTP_PORT}/tcp tren firewalld"
-else
-  warn "Khong thay ufw/firewalld — bo qua buoc tuong lua"
 fi
-warn "May ao dam may: nho mo cong ${HTTP_PORT} trong Security Group tren bang dieu khien."
 
 # ---------------------------------------------------------------------------
-step "6/7  Dung va chay (lan dau mat 5-15 phut)"
+if [ "${PREBUILT:-}" = "true" ]; then
+  step "6/7  Keo image dung san va kich hoat"
+else
+  step "6/7  Build va kich hoat (lan dau mat 5-15 phut)"
+fi
 # ---------------------------------------------------------------------------
 export HTTP_PORT
-docker compose up -d --build
+# Migration moi (neu co) tu chay trong entrypoint truoc khi API khoi dong.
+if [ "${PREBUILT:-}" = "true" ]; then
+  "${COMPOSE[@]}" pull
+  "${COMPOSE[@]}" up -d
+else
+  "${COMPOSE[@]}" up -d --build
+fi
 
 # ---------------------------------------------------------------------------
 step "7/7  Cho he thong san sang"
@@ -196,26 +233,46 @@ for _ in $(seq 1 60); do
   sleep 5
 done
 
-echo
 if [ "$READY" -eq 1 ]; then
   ok "Giao dien tra 200, API tra 401 (dung — dang doi token)"
   if [ "${SEED_DEMO:-}" = "true" ]; then
-    if docker compose exec -T -e SEED_DEMO=true api node dist/seed.js >/dev/null 2>&1; then
+    if "${COMPOSE[@]}" exec -T -e SEED_DEMO=true api node dist/seed.js >/dev/null 2>&1; then
       ok "Da nap danh muc va phieu mau"
     else
       warn "Khong nap duoc du lieu mau"
     fi
   fi
 else
-  docker compose ps || true
+  "${COMPOSE[@]}" ps || true
   echo
-  docker compose logs api --tail 40 || true
-  die "He thong chua san sang sau 5 phut. Xem log phia tren; thuong do DATABASE_URL khong khop POSTGRES_PASSWORD."
+  "${COMPOSE[@]}" logs api --tail 40 || true
+  echo
+  warn "Thuong do DATABASE_URL khong khop POSTGRES_PASSWORD trong deploy/app.env."
+  die "He thong chua san sang sau 5 phut. Xem log phia tren."
+fi
+
+# ---------------------------------------------------------------------------
+step "Don bo nho dem"
+# ---------------------------------------------------------------------------
+if [ "${NO_PRUNE:-}" = "true" ]; then
+  ok "Bo qua theo yeu cau"
+else
+  BEFORE_DISK=$(df -BM --output=avail / | tail -1 | tr -dc '0-9')
+  # Chi xoa image mo coi (dangling) — cac lop cu vua bi thay the.
+  # Co y KHONG dung 'docker system prune -a': lenh do xoa ca image cua du an khac
+  # tren cung may chu. Va khong bao gio dung '--volumes' vi do la du lieu that.
+  docker image prune -f >/dev/null 2>&1 || true
+  # Bo nho dem build cu hon 3 ngay; giu phan moi de lan build sau con nhanh.
+  docker builder prune -f --filter until=72h >/dev/null 2>&1 || true
+  AFTER_DISK=$(df -BM --output=avail / | tail -1 | tr -dc '0-9')
+  FREED=$((AFTER_DISK - BEFORE_DISK))
+  if [ "$FREED" -gt 0 ]; then ok "Da giai phong ${FREED} MB"; else ok "Khong co gi de don"; fi
 fi
 
 IP_SHOW=$(hostname -I 2>/dev/null | awk '{print $1}')
 [ -n "$IP_SHOW" ] || IP_SHOW="localhost"
 if [ "$HTTP_PORT" = "80" ]; then URL="http://$IP_SHOW"; else URL="http://$IP_SHOW:$HTTP_PORT"; fi
+CC="${COMPOSE[*]}"
 
 printf '\n%s%sHOAN TAT.%s\n\n' "$GREEN" "$BOLD" "$OFF"
 printf '  Dia chi      %s%s%s\n' "$BOLD" "$URL" "$OFF"
@@ -231,8 +288,9 @@ printf '  %sDoi mat khau ca 5 tai khoan ngay sau khi dang nhap lan dau.%s\n\n' "
 printf '  He thong khoi dong voi danh muc trong. Dang nhap cungung, vao form tao phieu,\n'
 printf '  bam "Quan ly" o tung o chon de nhap du an, hang muc chi, nha cung cap that.\n\n'
 printf '  Lenh thuong dung (chay trong %s):\n' "$REPO_DIR"
-printf '    docker compose ps                              xem trang thai\n'
-printf '    docker compose logs -f api                     xem log\n'
-printf '    docker compose down                            tat, giu du lieu\n'
-printf '    docker compose up -d                           bat lai\n'
-printf '    git pull && docker compose up -d --build       cap nhat phien ban moi\n\n'
+printf '    %s ps            xem trang thai\n' "$CC"
+printf '    %s logs -f api   xem log\n' "$CC"
+printf '    %s down          tat, giu du lieu\n' "$CC"
+printf '    ./deploy.sh              cap nhat len ban moi nhat\n\n'
+"${COMPOSE[@]}" ps
+echo

@@ -1,0 +1,55 @@
+# HỆ THỐNG PHIẾU YÊU CẦU CHI — chạy bằng image dựng sẵn trên GitHub Container Registry.
+#
+#   cp deploy/app.env.example deploy/app.env   # rồi sửa mật khẩu và JWT_SECRET
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Khác docker-compose.yml ở đúng một chỗ: kéo image có sẵn thay vì build tại chỗ.
+# Nhờ vậy máy chủ lên trong khoảng 30 giây và không cần RAM để biên dịch argon2.
+# Image do .github/workflows/publish-images.yml dựng mỗi lần đẩy lên nhánh main.
+#
+# Đổi phiên bản: IMAGE_TAG=sha-<commit> docker compose -f docker-compose.prod.yml up -d
+# Mặc định là "latest".
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    env_file: ./deploy/app.env
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  api:
+    image: ghcr.io/luanitnipponham/quanlykho-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: ./deploy/app.env
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      STORAGE_DIR: /app/storage
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: ghcr.io/luanitnipponham/quanlykho-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - '${HTTP_PORT:-80}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  storage:
