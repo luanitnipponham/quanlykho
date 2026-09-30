@@ -1,0 +1,438 @@
+// Schema for HỆ THỐNG PHIẾU YÊU CẦU CHI — workflow v3.4 (docs/workflow.md).
+// Mirrors the reference implementation in src/domain: same roles, statuses, slots and invariants.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums (workflow §2, §2b, §3, §8.2, §8.3)
+// ---------------------------------------------------------------------------
+
+enum Role {
+  REQUESTER
+  LEADER
+  FINANCE_MANAGER
+  ACCOUNTANT
+  ADMIN
+}
+
+enum DepartmentKind {
+  PROCUREMENT
+  BOARD
+  FINANCE
+  ACCOUNTING
+}
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+}
+
+/// AUTO_VERIFY is a transient branch inside T10 and is never persisted.
+enum RequestStatus {
+  DRAFT
+  LEADER_APPROVAL
+  ADVANCE_PREPARATION
+  COORDINATION
+  ADVANCE_PAYMENT
+  AFTER_ADVANCE
+  FINAL_PAYMENT
+  DOCUMENT_SUPPLEMENT_REQUIRED
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum PaymentMethod {
+  TRANSFER
+  CASH
+}
+
+enum TransactionKind {
+  ADVANCE
+  FINAL
+}
+
+enum AttachmentSlot {
+  REQUEST_FORM
+  QUOTATION_COMPARISON
+  PURCHASE_ORDER
+  ADVANCE_REQUEST
+  ADVANCE_PROOF
+  DELIVERY_RECORD
+  PAYMENT_REQUEST_DOC
+  INVOICE
+  FINAL_PROOF
+}
+
+/// Top-level folder under CHUNG_TU/, decided by the uploader's department.
+enum StorageFolder {
+  CUNG_UNG
+  KE_TOAN
+}
+
+enum TimelineAction {
+  CREATE
+  T1
+  T2
+  T3
+  T4
+  T5
+  T6
+  T7
+  T8
+  T9
+  T10
+  T11
+  T12
+  T13
+  A1
+  A2
+  A3
+  A4
+}
+
+// ---------------------------------------------------------------------------
+// Identity (workflow §2b, §11)
+// ---------------------------------------------------------------------------
+
+/// Exactly four rows, one per kind. Admin may rename them; rows are never added or removed.
+model Department {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  name      String
+  kind      DepartmentKind @unique
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  users User[]
+
+  @@map("departments")
+}
+
+model User {
+  id                 String     @id @default(uuid())
+  /// Login name issued by Admin; compared case-insensitively.
+  username           String     @unique
+  fullName           String     @map("full_name")
+  passwordHash       String     @map("password_hash")
+  mustChangePassword Boolean    @default(true) @map("must_change_password")
+  role               Role
+  /// Follows the role; null only for ADMIN, who belongs to no department.
+  departmentId       String?    @map("department_id")
+  status             UserStatus @default(ACTIVE)
+  failedLoginCount   Int        @default(0) @map("failed_login_count")
+  lockedUntil        DateTime?  @map("locked_until")
+  createdById        String?    @map("created_by")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  department    Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  createdBy     User?       @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers  User[]      @relation("UserCreatedBy")
+  createdRequests    PaymentRequest[] @relation("RequestCreatedBy")
+  requesterRequests  PaymentRequest[] @relation("RequestAssignedRequester")
+  accountantRequests PaymentRequest[] @relation("RequestAssignedAccountant")
+  attachments   Attachment[]
+  transactions  PaymentTransaction[]
+  timeline      RequestTimeline[]
+  comments      Comment[]
+  mentions      CommentMention[]
+  notifications Notification[]
+  auditEntries  AuditLog[]
+  refreshTokens RefreshToken[]
+
+  @@index([role, status])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Master data (workflow §8.1) — soft delete keeps names on historical requests
+// ---------------------------------------------------------------------------
+
+model Project {
+  id        String           @id @default(uuid())
+  code      String
+  name      String
+  deleted   Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+  requests  PaymentRequest[]
+
+  @@map("projects")
+}
+
+model Category {
+  id        String           @id @default(uuid())
+  code      String
+  name      String
+  deleted   Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+  requests  PaymentRequest[]
+
+  @@map("categories")
+}
+
+model RequesterName {
+  id        String           @id @default(uuid())
+  code      String
+  name      String
+  deleted   Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+  requests  PaymentRequest[]
+
+  @@map("requester_names")
+}
+
+model Vendor {
+  id        String           @id @default(uuid())
+  code      String
+  name      String
+  deleted   Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+  requests  PaymentRequest[]
+
+  @@map("vendors")
+}
+
+// ---------------------------------------------------------------------------
+// Payment request aggregate (workflow §5, §6)
+// ---------------------------------------------------------------------------
+
+model PaymentRequest {
+  id     String        @id @default(uuid())
+  /// PYC-YYYYMM-NNNN, generated once and never edited.
+  code   String        @unique
+  status RequestStatus @default(DRAFT)
+  /// Optimistic locking: every transition checks and bumps this in one transaction.
+  version Int          @default(1)
+
+  createdById          String  @map("created_by")
+  createdByRole        Role    @map("created_by_role")
+  assignedRequesterId  String  @map("assigned_requester_id")
+  assignedAccountantId String? @map("assigned_accountant_id")
+
+  projectId       String @map("project_id")
+  categoryId      String @map("category_id")
+  requesterNameId String @map("requester_name_id")
+  vendorId        String @map("vendor_id")
+
+  title String
+  note  String  @default("")
+  /// Checkbox "Có hóa đơn"; drives the AUTO_VERIFY branch at T10.
+  hasInvoice Boolean @default(true) @map("has_invoice")
+
+  requestedAmount  Decimal  @map("requested_amount") @db.Decimal(18, 2)
+  advanceAmount    Decimal? @map("advance_amount") @db.Decimal(18, 2)
+  settlementAmount Decimal? @map("settlement_amount") @db.Decimal(18, 2)
+
+  priority Priority?
+
+  invoiceDueStartAt  DateTime? @map("invoice_due_start_at")
+  lateInvoice        Boolean   @default(false) @map("late_invoice")
+  lastLateReminderOn String?   @map("last_late_reminder_on")
+  /// Set when the Leader returned the request (T5) or Admin reopened it (A3).
+  resubmitted        Boolean   @default(false)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+
+  createdBy          User          @relation("RequestCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  assignedRequester  User          @relation("RequestAssignedRequester", fields: [assignedRequesterId], references: [id], onDelete: Restrict)
+  assignedAccountant User?         @relation("RequestAssignedAccountant", fields: [assignedAccountantId], references: [id], onDelete: Restrict)
+  project            Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  category           Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  requesterName      RequesterName @relation(fields: [requesterNameId], references: [id], onDelete: Restrict)
+  vendor             Vendor        @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+
+  attachments  Attachment[]
+  transactions PaymentTransaction[]
+  timeline     RequestTimeline[]
+  comments     Comment[]
+  notifications Notification[]
+
+  @@index([status])
+  @@index([assignedRequesterId, status])
+  @@index([assignedAccountantId, status])
+  @@map("payment_requests")
+}
+
+model Attachment {
+  id        String         @id @default(uuid())
+  requestId String         @map("request_id")
+  slot      AttachmentSlot
+  /// Request status when the file was uploaded — files lock once that step is ticked.
+  stage     RequestStatus
+  folder    StorageFolder
+  fileName  String         @map("file_name")
+  /// /CHUNG_TU/{CUNG_UNG|KE_TOAN}/{YYYY-MM-DD}/{MA_PHIEU}/{file_name}
+  storagePath String       @unique @map("storage_path")
+  size        Int
+  mimeType    String       @map("mime_type")
+  uploadedById String      @map("uploaded_by")
+  uploadedAt   DateTime    @default(now()) @map("uploaded_at")
+
+  request    PaymentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploadedBy User           @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([requestId, slot])
+  @@map("attachments")
+}
+
+model PaymentTransaction {
+  id        String          @id @default(uuid())
+  requestId String          @map("request_id")
+  kind      TransactionKind
+  amount    Decimal         @db.Decimal(18, 2)
+  method    PaymentMethod
+  paidDate  String          @map("paid_date")
+  createdById String        @map("created_by")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  request   PaymentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  createdBy User           @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([requestId])
+  @@map("payment_transactions")
+}
+
+/// Permanent record of every transition; never purged by the audit retention job.
+model RequestTimeline {
+  id         String         @id @default(uuid())
+  requestId  String         @map("request_id")
+  action     TimelineAction
+  fromStatus RequestStatus? @map("from_status")
+  toStatus   RequestStatus? @map("to_status")
+  actorId    String?        @map("actor_id")
+  reason     String?
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  request PaymentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actor   User?          @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@map("request_timeline")
+}
+
+// ---------------------------------------------------------------------------
+// Collaboration (workflow §1.6)
+// ---------------------------------------------------------------------------
+
+model Comment {
+  id        String   @id @default(uuid())
+  requestId String   @map("request_id")
+  authorId  String   @map("author_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  request  PaymentRequest   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  author   User             @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  mentions CommentMention[]
+
+  @@index([requestId])
+  @@map("comments")
+}
+
+model CommentMention {
+  commentId String @map("comment_id")
+  userId    String @map("user_id")
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@map("comment_mentions")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  requestId String?  @map("request_id")
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  request PaymentRequest? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Audit & configuration (workflow §6.7, §8.4)
+// ---------------------------------------------------------------------------
+
+/// Append-only. The daily job deletes rows older than config.auditRetentionDays (6).
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?  @map("actor_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  detail    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@map("audit_log")
+}
+
+/// Ngày nghỉ lễ do Admin quản lý, dùng để đếm 5 ngày làm việc của B8.
+model Holiday {
+  date String @id
+  name String
+
+  @@map("holidays")
+}
+
+/// Single row keyed "SYSTEM".
+model SystemConfig {
+  key                        String   @id @default("SYSTEM")
+  invoiceDeadlineWorkingDays Int      @default(5) @map("invoice_deadline_working_days")
+  maxLoginAttempts           Int      @default(5) @map("max_login_attempts")
+  lockMinutes                Int      @default(15) @map("lock_minutes")
+  maxFileSizeMb              Int      @default(25) @map("max_file_size_mb")
+  auditRetentionDays         Int      @default(6) @map("audit_retention_days")
+  allowedExtensions          String[] @map("allowed_extensions")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@map("system_config")
+}
+
+/// Per-month counter backing the PYC-YYYYMM-NNNN code generator.
+model RequestSequence {
+  yearMonth String @id @map("year_month")
+  lastValue Int    @default(0) @map("last_value")
+
+  @@map("request_sequences")
+}

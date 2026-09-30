@@ -1,0 +1,14 @@
+# Mặc định để Git tự nhận diện văn bản.
+* text=auto
+
+# Các tệp sau luôn phải là LF: nếu bị CRLF, container Linux sẽ báo
+# "no such file or directory" ở dòng shebang hoặc nginx đọc sai cấu hình.
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+*.conf          text eol=lf
+docker-compose.yml text eol=lf
+
+# Chỉ chạy trên Windows.
+*.bat           text eol=crlf
+
+*.pdf           binary
