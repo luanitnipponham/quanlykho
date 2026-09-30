@@ -47,12 +47,40 @@ Kiểm tra:
 docker --version && docker compose version
 ```
 
+### Cài Docker nếu máy chủ chưa có
+
+Ubuntu / Debian — dùng kho chính thức của Docker, không dùng gói `docker.io` của distro
+vì bản đó thường thiếu plugin `compose` v2:
+
+```bash
+sudo apt update && sudo apt install -y ca-certificates curl gnupg git
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg   | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable"   | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker
+```
+
+> Trên Debian, thay `ubuntu` bằng `debian` ở hai URL trên.
+
+Cho phép chạy `docker` không cần `sudo` (đăng xuất rồi đăng nhập lại để có hiệu lực):
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
 ---
 
 ## 3. Triển khai lần đầu
 
 ```bash
-# 1. Chép mã nguồn lên máy chủ rồi vào thư mục dự án
+# 1. Tải mã nguồn về máy chủ
+sudo mkdir -p /opt && cd /opt
+sudo git clone https://github.com/luanitnipponham/quanlykho.git
+sudo chown -R $USER:$USER /opt/quanlykho
 cd /opt/quanlykho
 
 # 2. Tạo file cấu hình từ mẫu
@@ -74,6 +102,31 @@ docker compose logs -f api
 
 Mở `http://<địa-chỉ-máy-chủ>/`.
 
+### Mở tường lửa
+
+Chỉ cổng 80 (và 443 nếu đã bật HTTPS ở mục 6) cần mở. PostgreSQL và API **không**
+được mở ra ngoài — chúng chỉ nói chuyện trong mạng nội bộ của compose.
+
+```bash
+# Ubuntu / Debian
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw enable && sudo ufw status
+
+# RHEL / Rocky / AlmaLinux
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --reload
+```
+
+### Tự bật lại sau khi máy chủ khởi động lại
+
+Mọi service trong `docker-compose.yml` đều đặt `restart: unless-stopped`, nên chỉ cần
+Docker tự chạy lúc boot là đủ:
+
+```bash
+sudo systemctl enable docker
+```
+
 ### Bắt buộc sửa trong `deploy/app.env`
 
 | Biến | Ghi chú |
@@ -83,7 +136,14 @@ Mở `http://<địa-chỉ-máy-chủ>/`.
 | `JWT_SECRET` | **Bắt buộc đổi.** Để nguyên giá trị mẫu là lỗ hổng nghiêm trọng |
 | `SEED_PASSWORD` | Mật khẩu của 5 tài khoản mẫu tạo lần đầu |
 
-Lần chạy đầu, container `api` tự động: chờ PostgreSQL → áp migration → nạp dữ liệu mẫu **nếu cơ sở dữ liệu còn trống**. Những lần sau nó thấy đã có dữ liệu và bỏ qua bước nạp, nên không bao giờ ghi đè dữ liệu thật.
+Lần chạy đầu, container `api` tự động: chờ PostgreSQL → áp migration → nạp 4 phòng ban, 5 tài khoản, ngày lễ và cấu hình **nếu cơ sở dữ liệu còn trống**. Những lần sau nó thấy đã có dữ liệu và bỏ qua bước nạp, nên không bao giờ ghi đè dữ liệu thật.
+
+Danh mục (dự án, hạng mục chi, nhà cung cấp, người yêu cầu) và phiếu mẫu **không** được nạp:
+hệ thống bắt đầu trống để nhập dữ liệu thật. Nếu muốn có dữ liệu demo để xem thử:
+
+```bash
+docker compose exec -e SEED_DEMO=true api node dist/seed.js
+```
 
 Sau khi đăng nhập lần đầu, hệ thống bắt đổi mật khẩu. Nên đổi hết 5 tài khoản mẫu rồi xóa những tài khoản không dùng.
 
@@ -146,7 +206,10 @@ phieuchi.congty.vn {
 
 Sau khi có HTTPS, nhớ đặt `CORS_ORIGIN=https://phieuchi.congty.vn` trong `deploy/app.env`.
 
-Những việc còn lại trước khi chạy thật nằm ở [security.md §8](security.md): rate limiting, security headers ngoài phần nginx đã có, thu hồi quyền xóa trên bảng nhật ký.
+Giới hạn tần suất (`@nestjs/throttler`: 300 lượt/phút mỗi IP, riêng `/auth/login` 10 lượt/phút)
+và security header (`helmet`) đã bật sẵn trong API. Chỉnh bằng `RATE_LIMIT_PER_MINUTE` và
+`RATE_LIMIT_LOGIN_PER_MINUTE` trong `deploy/app.env` nếu cần.
+Việc còn lại trước khi chạy thật nằm ở [security.md §8](security.md): thu hồi quyền xóa trên bảng nhật ký.
 
 ---
 
@@ -175,4 +238,4 @@ Xem giao diện đang nói chuyện với đâu: badge góc phải màn hình hi
 | Cơ sở dữ liệu | PostgreSQL cài trên máy | Container `db` + volume `db-data` |
 | Tệp đính kèm | `apps/api/storage/` | Volume `storage` |
 | Migration | `npm run db:push` | `prisma migrate deploy` tự chạy lúc khởi động |
-| Mất backend | Tự lùi về chế độ demo trên trình duyệt | **Báo lỗi và dừng** — tránh nhập liệu vào chỗ không được lưu |
+| Mất backend | **Báo lỗi và dừng** (đặt `VITE_REQUIRE_BACKEND=true` trong `.env` gốc) | **Báo lỗi và dừng** — tránh nhập liệu vào chỗ không được lưu |
