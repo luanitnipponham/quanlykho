@@ -141,6 +141,8 @@ export const api = {
   action: (id: string, verb: string, body: unknown) => post<{ message: string; warning?: string; status?: Status }>(`/payment-requests/${id}/${verb}`, body),
   transfer: (body: unknown) => post<{ message: string }>('/payment-requests/transfer', body),
   deleteRequest: (id: string, reason: string, version: number) => del<{ message: string }>(`/payment-requests/${id}`, { reason, version }),
+  archiveRequest: (id: string, version: number) => post<{ message: string }>(`/payment-requests/${id}/archive`, { version }),
+  restoreRequest: (id: string, version: number) => post<{ message: string }>(`/payment-requests/${id}/restore`, { version }),
   comment: (id: string, content: string) => post(`/payment-requests/${id}/comments`, { content }),
 
   attachments: (id: string) => get<unknown[]>(`/payment-requests/${id}/attachments`),

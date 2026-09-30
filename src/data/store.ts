@@ -339,6 +339,10 @@ class Store {
         return api.transfer({ items: a.items, toRequesterId: a.toRequesterId, reason: a.reason });
       case 'DELETE_REQUEST':
         return api.deleteRequest(a.id, a.reason, a.version);
+      case 'ARCHIVE':
+        return api.archiveRequest(a.id, a.version);
+      case 'RESTORE':
+        return api.restoreRequest(a.id, a.version);
       case 'COMMENT':
         return (await api.comment(a.id, a.content), { message: 'Đã gửi comment' });
       case 'DETACH':

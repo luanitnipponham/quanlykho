@@ -120,6 +120,8 @@ export type ActionKey =
   | 'ADMIN_CANCEL'
   | 'REOPEN'
   | 'DELETE'
+  | 'ARCHIVE'
+  | 'RESTORE'
   | 'COMMENT';
 
 const ANY: Status[] = [...WORKING_STATUSES, 'COMPLETED', 'CANCELLED', 'REJECTED'];
@@ -142,10 +144,13 @@ export const ACTION_FROM: Record<ActionKey, Status[]> = {
   ADMIN_CANCEL: ANY,
   REOPEN: ['COMPLETED', 'CANCELLED', 'REJECTED'],
   DELETE: ANY,
+  // Chỉ dọn hồ sơ đã kết thúc: phiếu đang chạy còn cần file để làm việc.
+  ARCHIVE: ['COMPLETED'],
+  RESTORE: ['COMPLETED'],
   COMMENT: ANY,
 };
 
-const ADMIN_ONLY: ActionKey[] = ['TRANSFER', 'FORCE', 'ADMIN_CANCEL', 'REOPEN', 'DELETE'];
+const ADMIN_ONLY: ActionKey[] = ['TRANSFER', 'FORCE', 'ADMIN_CANCEL', 'REOPEN', 'DELETE', 'ARCHIVE', 'RESTORE'];
 /** Admin may run these at any status, including COMPLETED (workflow §9.1). */
 const ADMIN_ANY_STATUS: ActionKey[] = ['EDIT_DRAFT', 'TRANSFER', 'FORCE', 'ADMIN_CANCEL', 'DELETE', 'COMMENT'];
 

@@ -62,6 +62,31 @@ Mỗi transition đi qua đủ các bước sau **trong cùng transaction**:
 2. `status` hiện tại nằm trong danh sách `ACTION_FROM[action]` → nếu không: `ERR_INVALID_TRANSITION`.
    Riêng Admin được bỏ qua bước này với `EDIT_DRAFT`, `TRANSFER`, `FORCE`, `ADMIN_CANCEL`, `DELETE`, `COMMENT`.
 
+### Lưu trữ (A5): dọn đĩa mà vẫn giữ hồ sơ
+
+`POST /payment-requests/:id/archive` chuyển tệp đính kèm sang NAS rồi xóa khỏi đĩa máy chủ.
+**Không** đụng tới hàng `payment_requests` hay `attachments`, chỉ đặt `archived_at`. Phiếu
+vẫn tra cứu được đầy đủ và báo cáo vẫn đúng; danh sách tệp còn nguyên, chỉ là tệp nằm ở NAS.
+
+`POST /payment-requests/:id/restore` kéo tệp về lại đúng đường dẫn cũ và xóa `archived_at`.
+
+Chỉ Admin, và chỉ với phiếu ở trạng thái `COMPLETED` — phiếu đang chạy còn cần tệp để làm việc.
+
+Vì sao lưu trữ tệp thay vì xóa cả phiếu: một phiếu chiếm khoảng **5 KB** trong PostgreSQL
+nhưng tệp đính kèm của nó khoảng **18 MB**. Toàn bộ dung lượng nằm ở tệp, nên dọn tệp đã
+lấy lại gần như tất cả, còn xóa hàng thì mất khả năng tra cứu mà chẳng tiết kiệm thêm.
+
+Ba chốt an toàn:
+
+1. Máy chủ chỉ làm việc khi thấy tệp mốc `.quanlykho-archive` trong `ARCHIVE_DIR` —
+   do [`deploy/backup.sh`](../deploy/backup.sh) tạo trên NAS. NAS rớt thì điểm gắn thành
+   thư mục rỗng, không có tệp mốc, và thao tác bị từ chối. Thiếu chốt này, "lưu trữ" sẽ
+   chép tệp sang chính máy chủ rồi xóa bản gốc.
+2. Chỉ xóa bản trên máy chủ **sau khi** đối chiếu bản trên NAS đúng kích thước.
+3. Phục hồi kiểm tra đủ bộ trước khi chép; thiếu một tệp là dừng, chưa chép gì cả.
+
+Bật tính năng: xem [deploy.md §5](deploy.md).
+
 ### Xóa phiếu (A3) là xóa vĩnh viễn
 
 `DELETE /payment-requests/:id` xóa **thật** khỏi PostgreSQL, không phải đánh dấu ẩn. Khóa

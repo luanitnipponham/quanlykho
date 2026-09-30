@@ -74,6 +74,7 @@ export type WorkflowAction =
   | ({ type: 'FORCE'; toStatus: Status; reason: string } & Versioned)
   | ({ type: 'ADMIN_CANCEL' | 'DELETE_REQUEST'; reason: string } & Versioned)
   | ({ type: 'REOPEN'; reason: string; toStatus?: Status } & Versioned)
+  | ({ type: 'ARCHIVE' | 'RESTORE' } & Versioned)
   | { type: 'COMMENT'; id: string; content: string }
   | { type: 'NOTIFY_MISSING_DOCS'; id: string; note?: string };
 
@@ -349,6 +350,7 @@ function apply(db: Db, actor: User, action: WorkflowAction, now: Date): Workflow
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
         completedAt: null,
+        archivedAt: null,
       };
       pr.timeline.push({
         id: nextId(db, 'tl'),
@@ -707,6 +709,27 @@ function apply(db: Db, actor: User, action: WorkflowAction, now: Date): Workflow
       db.comments = db.comments.filter((c) => c.requestId !== pr.id);
       audit(db, me, 'DELETE', 'payment_request', pr.id, `Xóa phiếu ${pr.code} – ${reason}`, now);
       return { removedAttachmentIds: removed, message: `Đã xóa phiếu ${pr.code}` };
+    }
+
+    // ----- Lưu trữ (A5) ----------------------------------------------------
+    // Chế độ demo trên trình duyệt không có NAS, nên chỉ đổi nhãn; file vẫn nằm
+    // trong IndexedDB. Việc dọn đĩa thật do máy chủ làm khi chạy cùng backend.
+    case 'ARCHIVE': {
+      const pr = guard(db, actor, action.id, action.version, 'ARCHIVE');
+      if (pr.archivedAt) throw new DomainError('ERR_ALREADY_ARCHIVED', `Phiếu ${pr.code} đã được lưu trữ trước đó`);
+      pr.archivedAt = now.toISOString();
+      pr.version += 1;
+      audit(db, me, 'ARCHIVE', 'payment_request', pr.id, `Lưu trữ ${pr.code}: dọn file đính kèm khỏi máy chủ`, now);
+      return { message: `Đã lưu trữ phiếu ${pr.code}` };
+    }
+
+    case 'RESTORE': {
+      const pr = guard(db, actor, action.id, action.version, 'RESTORE');
+      if (!pr.archivedAt) throw new DomainError('ERR_NOT_ARCHIVED', `Phiếu ${pr.code} chưa được lưu trữ`);
+      pr.archivedAt = null;
+      pr.version += 1;
+      audit(db, me, 'RESTORE', 'payment_request', pr.id, `Phục hồi ${pr.code} từ NAS`, now);
+      return { message: `Đã phục hồi phiếu ${pr.code}` };
     }
 
     // ----- Comments --------------------------------------------------------

@@ -262,6 +262,9 @@ model PaymentRequest {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   completedAt DateTime? @map("completed_at")
+  /// Đã dọn file đính kèm khỏi đĩa máy chủ; bản sao nằm trên NAS. Hàng phiếu và
+  /// hàng attachment vẫn giữ nguyên nên tra cứu và phục hồi được (A5).
+  archivedAt  DateTime? @map("archived_at")
 
   createdBy          User          @relation("RequestCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   assignedRequester  User          @relation("RequestAssignedRequester", fields: [assignedRequesterId], references: [id], onDelete: Restrict)

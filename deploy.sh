@@ -152,8 +152,9 @@ cd "$REPO_DIR"
 
 # docker compose tu doc file .env cua du an. Neu chi dat HTTP_PORT o do ma script
 # lai mac dinh 80 thi buoc kiem tra cuoi se do nham cong va bao that bai oan.
-if [ -z "$HTTP_PORT_ARG" ] && [ -f .env ]; then
-  HTTP_PORT_ENV=$(grep -E '^HTTP_PORT=' .env | tail -1 | cut -d= -f2- | tr -dc '0-9')
+if [ -f .env ]; then
+  [ -n "$HTTP_PORT_ARG" ] || HTTP_PORT_ENV=$(grep -E '^HTTP_PORT=' .env | tail -1 | cut -d= -f2- | tr -dc '0-9')
+  ARCHIVE_HOST_DIR="${ARCHIVE_HOST_DIR:-$(grep -E '^ARCHIVE_HOST_DIR=' .env | tail -1 | cut -d= -f2-)}"
 fi
 HTTP_PORT="${HTTP_PORT_ARG:-${HTTP_PORT_ENV:-80}}"
 
@@ -180,7 +181,17 @@ if [ "${PREBUILT:-}" = "true" ]; then
   [ -f docker-compose.prod.yml ] || die "Khong thay docker-compose.prod.yml"
   COMPOSE=(docker compose -f docker-compose.prod.yml)
 else
-  COMPOSE=(docker compose)
+  COMPOSE=(docker compose -f docker-compose.yml)
+fi
+
+# Kho luu tru tren NAS chi duoc gan khi da khai bao ro rang (xem docker-compose.archive.yml).
+if [ -n "${ARCHIVE_HOST_DIR:-}" ]; then
+  if [ -d "$ARCHIVE_HOST_DIR" ]; then
+    export ARCHIVE_HOST_DIR
+    COMPOSE+=(-f docker-compose.archive.yml)
+  else
+    warn "ARCHIVE_HOST_DIR=$ARCHIVE_HOST_DIR khong ton tai — bo qua phan gan NAS."
+  fi
 fi
 
 # ---------------------------------------------------------------------------

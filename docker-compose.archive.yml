@@ -1,0 +1,20 @@
+# Gắn kho lưu trữ trên NAS vào container API, để chức năng Lưu trữ / Phục hồi (A5) dùng được.
+#
+# Chỉ nạp file này khi đã đặt ARCHIVE_HOST_DIR trong .env ở gốc dự án:
+#
+#   echo 'ARCHIVE_HOST_DIR=/mnt/nas/quanlykho' >> .env
+#   ./deploy.sh
+#
+# deploy.sh thấy biến đó thì tự thêm  -f docker-compose.archive.yml  vào lệnh compose.
+#
+# Cố ý tách riêng thay vì gắn sẵn trong compose chính: Docker tự tạo thư mục nguồn
+# nếu nó chưa tồn tại, nên gắn mặc định sẽ âm thầm dựng /mnt/nas/quanlykho ngay trên
+# đĩa máy chủ khi NAS chưa được gắn — đúng cái bẫy mà tính năng này phải tránh.
+# Dấu :? bên dưới bắt compose dừng lại nếu biến chưa được đặt.
+
+services:
+  api:
+    environment:
+      ARCHIVE_DIR: /archive
+    volumes:
+      - ${ARCHIVE_HOST_DIR:?can dat ARCHIVE_HOST_DIR trong .env, vi du /mnt/nas/quanlykho}:/archive

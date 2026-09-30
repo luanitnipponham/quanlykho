@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  Archive,
+  ArchiveRestore,
   Bell,
   CheckCircle2,
   FileCheck2,
@@ -36,6 +38,7 @@ export function CompletedRequestsPage() {
   const [notifyPr, setNotifyPr] = useState<PaymentRequest | null>(null);
   const [returnPr, setReturnPr] = useState<PaymentRequest | null>(null);
   const [deletePr, setDeletePr] = useState<PaymentRequest | null>(null);
+  const [archivePr, setArchivePr] = useState<PaymentRequest | null>(null);
 
   // Form states for modals
   const [notifyNote, setNotifyNote] = useState('');
@@ -343,6 +346,30 @@ export function CompletedRequestsPage() {
                               <RotateCcw className="h-4 w-4" />
                             </button>
                           )}
+
+                          {/* Admin: Lưu trữ / Phục hồi tệp đính kèm (A5) */}
+                          {isAdminUser &&
+                            (pr.archivedAt ? (
+                              <button
+                                onClick={async () => {
+                                  await attempt(() => store.run({ type: 'RESTORE', id: pr.id, version: pr.version }));
+                                }}
+                                className="rounded p-1.5 text-amber-600 transition-colors hover:bg-amber-50 hover:text-amber-800"
+                                title={`Đã lưu trữ ${new Date(pr.archivedAt).toLocaleDateString('vi-VN')} — bấm để kéo tệp từ NAS về`}
+                                aria-label={`Phục hồi tệp của ${pr.code}`}
+                              >
+                                <ArchiveRestore className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setArchivePr(pr)}
+                                className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                                title="Lưu trữ: chuyển tệp đính kèm sang NAS rồi xóa khỏi đĩa máy chủ, hồ sơ vẫn tra cứu được"
+                                aria-label={`Lưu trữ tệp của ${pr.code}`}
+                              >
+                                <Archive className="h-4 w-4" />
+                              </button>
+                            ))}
 
                           {/* Admin: Delete Request */}
                           {isAdminUser && (
@@ -756,6 +783,59 @@ export function CompletedRequestsPage() {
                 placeholder="Nhập lý do xóa phiếu hoàn thành này..."
               />
             </Field>
+          </div>
+        </Modal>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 5. Modal: Admin lưu trữ tệp đính kèm sang NAS (A5) */}
+      {/* ------------------------------------------------------------------ */}
+      {archivePr && (
+        <Modal
+          title={`Lưu trữ tệp đính kèm — ${archivePr.code}`}
+          onClose={() => setArchivePr(null)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setArchivePr(null)}>
+                Hủy
+              </Button>
+              <Button
+                onClick={async () => {
+                  const ok = await attempt(() =>
+                    store.run({ type: 'ARCHIVE', id: archivePr.id, version: archivePr.version }),
+                  );
+                  if (ok) setArchivePr(null);
+                }}
+              >
+                <Archive className="h-4 w-4" /> Chuyển sang NAS và dọn đĩa
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <Notice tone="info">
+              <p className="font-semibold text-slate-900">Hồ sơ được giữ nguyên, chỉ tệp rời khỏi máy chủ.</p>
+              <p className="mt-1 text-sm text-slate-700">
+                Phiếu vẫn tra cứu được đầy đủ: số tiền, nhà cung cấp, dự án và toàn bộ lịch sử duyệt. Danh sách tệp
+                cũng còn nguyên, chỉ là tệp nằm trên NAS thay vì trên đĩa máy chủ.
+              </p>
+            </Notice>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <p className="font-medium text-slate-900">Trình tự thực hiện</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs">
+                <li>Chép từng tệp sang NAS rồi đối chiếu đúng kích thước</li>
+                <li>Chỉ khi khớp mới xóa bản trên đĩa máy chủ</li>
+                <li>Đánh dấu phiếu đã lưu trữ</li>
+              </ol>
+              <p className="mt-2 text-xs text-slate-600">
+                NAS chưa gắn hoặc chép không khớp thì dừng lại và không xóa gì cả.
+              </p>
+            </div>
+
+            <p className="text-sm text-slate-600">
+              Đảo lại bất cứ lúc nào bằng nút <span className="font-medium">Phục hồi</span> trên cùng dòng.
+            </p>
           </div>
         </Modal>
       )}

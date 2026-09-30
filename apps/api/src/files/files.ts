@@ -43,6 +43,109 @@ function pruneIfEmpty(dir: string): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Kho lưu trữ trên NAS (A5)
+// ---------------------------------------------------------------------------
+
+/** Gốc kho lưu trữ, gắn vào container qua biến ARCHIVE_DIR. Rỗng nghĩa là tắt tính năng. */
+export const ARCHIVE_DIR = process.env.ARCHIVE_DIR || '';
+
+/**
+ * Tệp mốc nằm sẵn trên NAS. Không có nó thì coi như NAS chưa được gắn.
+ *
+ * Nếu NAS rớt, điểm gắn trở thành thư mục rỗng trên đĩa máy chủ. Thiếu kiểm tra này,
+ * "lưu trữ" sẽ chép file sang chính máy chủ rồi xóa bản gốc — mất sạch mà vẫn báo thành công.
+ */
+const ARCHIVE_MARKER = '.quanlykho-archive';
+
+export function archiveAvailable(): boolean {
+  return !!ARCHIVE_DIR && fs.existsSync(path.join(ARCHIVE_DIR, ARCHIVE_MARKER));
+}
+
+function assertArchiveReady(): void {
+  if (!ARCHIVE_DIR) {
+    fail('ERR_ARCHIVE_NOT_CONFIGURED', 'Chưa cấu hình kho lưu trữ. Đặt ARCHIVE_DIR và gắn NAS vào container.');
+  }
+  if (!fs.existsSync(path.join(ARCHIVE_DIR, ARCHIVE_MARKER))) {
+    fail(
+      'ERR_ARCHIVE_UNAVAILABLE',
+      `Không thấy dấu hiệu kho lưu trữ tại ${ARCHIVE_DIR}. NAS có thể chưa được gắn — kiểm tra trước khi thử lại.`,
+    );
+  }
+}
+
+/**
+ * Đẩy file đính kèm sang NAS rồi xóa khỏi đĩa máy chủ. Hàng trong CSDL giữ nguyên
+ * nên phiếu vẫn tra cứu được và biết chính xác từng file đã nằm ở đâu.
+ *
+ * Chỉ xóa bản trên máy chủ sau khi đã đối chiếu bản trên NAS đúng kích thước.
+ */
+export function archiveStoredFiles(storagePaths: string[]): { moved: number; bytes: number; missing: string[] } {
+  assertArchiveReady();
+  const dirs = new Set<string>();
+  const missing: string[] = [];
+  let moved = 0;
+  let bytes = 0;
+
+  for (const p of storagePaths) {
+    const rel = p.replace(/^\//, '');
+    const local = path.join(STORAGE_DIR, rel);
+    const remote = path.join(ARCHIVE_DIR, rel);
+
+    if (!fs.existsSync(local)) {
+      // Đã lưu trữ từ trước thì bỏ qua; mất cả hai bên thì phải nói ra.
+      if (!fs.existsSync(remote)) missing.push(p);
+      continue;
+    }
+
+    const size = fs.statSync(local).size;
+    if (!fs.existsSync(remote) || fs.statSync(remote).size !== size) {
+      fs.mkdirSync(path.dirname(remote), { recursive: true });
+      fs.copyFileSync(local, remote);
+    }
+    if (!fs.existsSync(remote) || fs.statSync(remote).size !== size) {
+      fail('ERR_ARCHIVE_COPY_FAILED', `Chép lên NAS không khớp kích thước: ${p}. Đã dừng, chưa xóa gì.`);
+    }
+
+    fs.rmSync(local, { force: true });
+    dirs.add(path.dirname(local));
+    moved += 1;
+    bytes += size;
+  }
+
+  for (const dir of dirs) {
+    pruneIfEmpty(dir);
+    pruneIfEmpty(path.dirname(dir));
+  }
+  return { moved, bytes, missing };
+}
+
+/** Kéo file từ NAS về lại đĩa máy chủ, đúng đường dẫn cũ ghi trong CSDL. */
+export function restoreStoredFiles(storagePaths: string[]): { restored: number; missing: string[] } {
+  assertArchiveReady();
+  const missing: string[] = [];
+
+  // Kiểm tra đủ bộ trước khi chép: phục hồi được một nửa còn khó xử hơn là không phục hồi.
+  for (const p of storagePaths) {
+    const rel = p.replace(/^\//, '');
+    if (!fs.existsSync(path.join(STORAGE_DIR, rel)) && !fs.existsSync(path.join(ARCHIVE_DIR, rel))) missing.push(p);
+  }
+  if (missing.length) {
+    fail('ERR_ARCHIVE_INCOMPLETE', `Thiếu ${missing.length} file trên NAS, ví dụ: ${missing[0]}. Chưa phục hồi gì.`);
+  }
+
+  let restored = 0;
+  for (const p of storagePaths) {
+    const rel = p.replace(/^\//, '');
+    const local = path.join(STORAGE_DIR, rel);
+    if (fs.existsSync(local)) continue;
+    fs.mkdirSync(path.dirname(local), { recursive: true });
+    fs.copyFileSync(path.join(ARCHIVE_DIR, rel), local);
+    restored += 1;
+  }
+  return { restored, missing };
+}
+
 /**
  * Xóa file vật lý của các đính kèm rồi dọn thư mục mã phiếu và thư mục ngày nếu rỗng.
  * Xóa phiếu chỉ xóa hàng trong CSDL (cascade), nên nếu không gọi hàm này thì file

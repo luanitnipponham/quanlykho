@@ -273,6 +273,27 @@ thức sau khi `gzip -t` xác nhận hợp lệ, nên mất điện giữa chừ
 
 `rsync` cố ý **không** dùng `--delete`: nếu ai đó lỡ xóa tệp trong ứng dụng, bản sao vẫn còn.
 
+### Bật chức năng Lưu trữ / Phục hồi
+
+Sau khi gắn NAS và chạy `backup.sh` ít nhất một lần (để có tệp mốc `.quanlykho-archive`):
+
+```bash
+cd /opt/quanlykho
+echo 'ARCHIVE_HOST_DIR=/mnt/nas/quanlykho' >> .env
+./deploy.sh
+```
+
+`deploy.sh` thấy biến đó thì tự thêm [`docker-compose.archive.yml`](../docker-compose.archive.yml)
+vào lệnh compose, gắn thư mục NAS vào container API tại `/archive`.
+
+Từ đó Admin thấy thêm hai nút ở màn **Phiếu hoàn thành**: biểu tượng hộp lưu trữ để chuyển
+tệp sang NAS và dọn đĩa máy chủ, biểu tượng mũi tên để kéo tệp về lại. Hồ sơ phiếu không
+bị đụng tới nên vẫn tra cứu và báo cáo bình thường.
+
+Phần gắn NAS cố ý tách thành file compose riêng: Docker tự tạo thư mục nguồn nếu nó chưa
+tồn tại, nên gắn mặc định sẽ âm thầm dựng `/mnt/nas/quanlykho` ngay trên đĩa máy chủ khi
+NAS chưa được gắn — đúng cái bẫy mà tính năng này phải tránh.
+
 ### Gắn NAS
 
 ```bash

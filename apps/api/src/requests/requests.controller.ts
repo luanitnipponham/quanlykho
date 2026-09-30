@@ -148,6 +148,19 @@ export class RequestsController {
     return this.svc.remove(actor, id, dto);
   }
 
+  /** A5: dọn file đính kèm khỏi đĩa máy chủ, hồ sơ giữ nguyên để còn tra cứu. */
+  @Post(':id/archive')
+  @Roles('ADMIN')
+  archive(@CurrentUser() actor: Actor, @Param('id') id: string, @Body() dto: VersionDto) {
+    return this.svc.archive(actor, id, dto);
+  }
+
+  @Post(':id/restore')
+  @Roles('ADMIN')
+  restore(@CurrentUser() actor: Actor, @Param('id') id: string, @Body() dto: VersionDto) {
+    return this.svc.restore(actor, id, dto);
+  }
+
   // ----- Collaboration -----------------------------------------------------
 
   @Post(':id/comments')

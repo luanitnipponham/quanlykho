@@ -74,6 +74,9 @@ if ! mountpoint -q "$BACKUP_DIR" && [ "${ALLOW_LOCAL:-}" != "true" ]; then
 fi
 
 mkdir -p "$DEST/db" "$DEST/CHUNG_TU"
+# Tep moc: API doi thay no moi cho phep Luu tru / Phuc hoi (A5). Neu NAS rot,
+# diem gan thanh thu muc rong khong co tep nay, va thao tac bi tu choi.
+touch "$DEST/.quanlykho-archive"
 touch "$DEST/.ghi_thu" 2>/dev/null || die "Khong ghi duoc vao $DEST. Kiem tra quyen hoac tuy chon uid khi mount."
 rm -f "$DEST/.ghi_thu"
 ok "Ghi duoc vao $DEST"

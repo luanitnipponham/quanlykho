@@ -3,7 +3,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { removeStoredFiles } from '../files/files';
+import { archiveStoredFiles, removeStoredFiles, restoreStoredFiles } from '../files/files';
 import {
   ACTION_FROM,
   type ActionKey,
@@ -532,6 +532,77 @@ export class RequestsService {
     // mà transaction rollback thì phiếu còn nguyên nhưng chứng từ đã mất vĩnh viễn.
     removeStoredFiles(paths);
     return result;
+  }
+
+  // -------------------------------------------------------------------------
+  // Lưu trữ (A5): dọn file khỏi đĩa máy chủ, giữ nguyên hồ sơ để còn tra cứu
+  // -------------------------------------------------------------------------
+
+  async archive(actor: Actor, id: string, dto: VersionDto) {
+    const { pr, paths } = await this.loadForArchive(actor, id, dto.version, 'ARCHIVE');
+    if (pr.archivedAt) fail('ERR_ALREADY_ARCHIVED', `Phiếu ${pr.code} đã được lưu trữ trước đó`);
+    if (!paths.length) fail('ERR_NOTHING_TO_ARCHIVE', `Phiếu ${pr.code} không có file đính kèm nào để lưu trữ`);
+
+    // Chuyển file TRƯỚC rồi mới đánh dấu. Làm ngược lại thì một lần chép hỏng sẽ để
+    // phiếu mang nhãn "đã lưu trữ" trong khi file vẫn nằm trên máy chủ.
+    const { moved, bytes, missing } = archiveStoredFiles(paths);
+
+    return this.tx(actor, id, dto.version, 'ARCHIVE', async (tx, cur) => {
+      await tx.paymentRequest.update({
+        where: { id },
+        data: { archivedAt: new Date(), version: { increment: 1 } },
+      });
+      const mb = (bytes / 1048576).toFixed(1);
+      await this.audit(
+        tx,
+        actor.id,
+        'ARCHIVE',
+        'payment_request',
+        id,
+        `Lưu trữ ${cur.code}: chuyển ${moved} file (${mb} MB) sang NAS, xóa khỏi đĩa máy chủ` +
+          (missing.length ? ` — ${missing.length} file không tìm thấy ở cả hai nơi` : ''),
+      );
+      return {
+        message:
+          `Đã lưu trữ ${moved} file (${mb} MB) của phiếu ${cur.code}` +
+          (missing.length ? `. Cảnh báo: ${missing.length} file không tìm thấy` : ''),
+      };
+    });
+  }
+
+  async restore(actor: Actor, id: string, dto: VersionDto) {
+    const { pr, paths } = await this.loadForArchive(actor, id, dto.version, 'RESTORE');
+    if (!pr.archivedAt) fail('ERR_NOT_ARCHIVED', `Phiếu ${pr.code} chưa được lưu trữ`);
+
+    // Kéo đủ file về trước; hàm này tự dừng nếu thiếu, chưa chép gì cả.
+    const { restored } = restoreStoredFiles(paths);
+
+    return this.tx(actor, id, dto.version, 'RESTORE', async (tx, cur) => {
+      await tx.paymentRequest.update({ where: { id }, data: { archivedAt: null, version: { increment: 1 } } });
+      await this.audit(
+        tx,
+        actor.id,
+        'RESTORE',
+        'payment_request',
+        id,
+        `Phục hồi ${cur.code}: kéo ${restored} file từ NAS về đĩa máy chủ`,
+      );
+      return { message: `Đã phục hồi ${restored} file của phiếu ${cur.code}` };
+    });
+  }
+
+  /** Kiểm tra quyền và phiên bản trước khi đụng tới ổ đĩa, vì thao tác file nằm ngoài transaction. */
+  private async loadForArchive(actor: Actor, id: string, version: number, key: 'ARCHIVE' | 'RESTORE') {
+    const pr = await this.prisma.paymentRequest.findUnique({ where: { id } });
+    if (!pr) fail('ERR_NOT_FOUND', 'Không tìm thấy phiếu');
+    authorize(actor, pr as never, key);
+    if (pr.version !== version) {
+      fail('ERR_VERSION_CONFLICT', `Phiếu ${pr.code} vừa được người khác cập nhật. Vui lòng tải lại và thử lại.`);
+    }
+    const paths = (
+      await this.prisma.attachment.findMany({ where: { requestId: id }, select: { storagePath: true } })
+    ).map((a) => a.storagePath);
+    return { pr, paths };
   }
 
   // -------------------------------------------------------------------------

@@ -144,6 +144,8 @@ export interface PaymentRequest {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  /** Đã dọn file đính kèm khỏi đĩa máy chủ; bản sao còn trên NAS và phục hồi được. */
+  archivedAt: string | null;
 }
 
 export interface Comment {

@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent } from 'react';
-import { Download, Eye, FileImage, FileText, Lock, Trash2, UploadCloud } from 'lucide-react';
+import { Archive, Download, Eye, FileImage, FileText, Lock, Trash2, UploadCloud } from 'lucide-react';
 import { useDb, useMe } from '../../data/hooks';
 import { store } from '../../data/store';
 import { SLOT_DEF, SLOT_GROUPS, stepIndex } from '../../domain/constants';
@@ -152,6 +152,17 @@ export function AttachmentGroups({ pr }: { pr: PaymentRequest }) {
   const groupStepIndex: Record<string, number> = { 'B1.1': 0, B3: 3, B5: 5, B6: 6, B7: 7 };
   return (
     <div className="flex flex-col gap-5">
+      {/* Tệp đã rời khỏi đĩa máy chủ: xem/tải sẽ lỗi cho tới khi Admin phục hồi. */}
+      {pr.archivedAt && (
+        <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <Archive className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            <span className="font-medium">Đã lưu trữ ngày {new Date(pr.archivedAt).toLocaleDateString('vi-VN')}.</span>{' '}
+            Danh sách tệp bên dưới giữ nguyên, nhưng tệp đang nằm trên NAS chứ không còn trên máy chủ nên chưa xem hay
+            tải được. Admin bấm <span className="font-medium">Phục hồi</span> ở màn Phiếu hoàn thành để kéo về.
+          </span>
+        </p>
+      )}
       {SLOT_GROUPS.map((g) => {
         const has = g.slots.some((s) => db.attachments.some((a) => a.requestId === pr.id && a.slot === s));
         const open = has || reached >= groupStepIndex[g.step];

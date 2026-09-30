@@ -86,6 +86,7 @@ function mapRequest(r: Row): PaymentRequest {
     createdAt: iso(r.createdAt),
     updatedAt: iso(r.updatedAt),
     completedAt: (r.completedAt as string) ?? null,
+    archivedAt: (r.archivedAt as string) ?? null,
   };
 }
 
