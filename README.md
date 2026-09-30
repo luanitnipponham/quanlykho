@@ -32,6 +32,15 @@ Máy trạng thái nằm trong `src/domain/` và được nhân bản ở `apps/
 
 ## 3. Chạy bằng Docker (khuyến nghị)
 
+Một lệnh trên máy chủ Linux trắng — tự cài Docker, sinh mật khẩu, dựng và kiểm tra:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/luanitnipponham/quanlykho/main/deploy/install.sh -o install.sh
+sudo bash install.sh
+```
+
+Hoặc làm thủ công nếu đã có Docker:
+
 ```bash
 cp deploy/app.env.example deploy/app.env   # rồi đổi mật khẩu và JWT_SECRET
 docker compose up -d --build

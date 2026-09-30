@@ -76,6 +76,24 @@ newgrp docker
 
 ## 3. Triển khai lần đầu
 
+### Cách nhanh: một lệnh
+
+[`deploy/install.sh`](../deploy/install.sh) làm trọn bộ — kiểm tra máy chủ và tạo swap nếu
+thiếu RAM, cài Docker nếu chưa có, tải mã nguồn, sinh `POSTGRES_PASSWORD` và `JWT_SECRET`
+ngẫu nhiên (đảm bảo khớp giữa `DATABASE_URL` và `POSTGRES_PASSWORD`), mở tường lửa, dựng
+container rồi chờ tới khi giao diện trả 200 và API trả 401:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/luanitnipponham/quanlykho/main/deploy/install.sh -o install.sh
+less install.sh          # nên đọc trước khi chạy bằng quyền root
+sudo bash install.sh
+```
+
+Tùy chọn: `sudo HTTP_PORT=8080 bash install.sh` để đổi cổng, `SEED_DEMO=true` để nạp thêm
+dữ liệu mẫu. Chạy lại nhiều lần vẫn an toàn — script không ghi đè `deploy/app.env` đã có.
+
+### Cách thủ công, từng bước
+
 ```bash
 # 1. Tải mã nguồn về máy chủ
 sudo mkdir -p /opt && cd /opt
