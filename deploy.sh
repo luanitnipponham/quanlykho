@@ -155,6 +155,7 @@ cd "$REPO_DIR"
 if [ -f .env ]; then
   [ -n "$HTTP_PORT_ARG" ] || HTTP_PORT_ENV=$(grep -E '^HTTP_PORT=' .env | tail -1 | cut -d= -f2- | tr -dc '0-9')
   ARCHIVE_HOST_DIR="${ARCHIVE_HOST_DIR:-$(grep -E '^ARCHIVE_HOST_DIR=' .env | tail -1 | cut -d= -f2-)}"
+  NAS_HOST="${NAS_HOST:-$(grep -E '^NAS_HOST=' .env | tail -1 | cut -d= -f2-)}"
 fi
 HTTP_PORT="${HTTP_PORT_ARG:-${HTTP_PORT_ENV:-80}}"
 
@@ -184,14 +185,20 @@ else
   COMPOSE=(docker compose -f docker-compose.yml)
 fi
 
-# Kho luu tru tren NAS chi duoc gan khi da khai bao ro rang (xem docker-compose.archive.yml).
+# Kho luu tru chi duoc gan khi da khai bao ro rang. Hai cach, uu tien cach da gan san
+# o muc he dieu hanh vi no khong can mat khau NAS nam trong .env.
 if [ -n "${ARCHIVE_HOST_DIR:-}" ]; then
   if [ -d "$ARCHIVE_HOST_DIR" ]; then
     export ARCHIVE_HOST_DIR
     COMPOSE+=(-f docker-compose.archive.yml)
+    ok "Kho luu tru: thu muc da gan san $ARCHIVE_HOST_DIR"
   else
     warn "ARCHIVE_HOST_DIR=$ARCHIVE_HOST_DIR khong ton tai — bo qua phan gan NAS."
   fi
+elif [ -n "${NAS_HOST:-}" ]; then
+  # Docker tu noi toi NAS bang CIFS; khong can he dieu hanh gan truoc.
+  COMPOSE+=(-f docker-compose.archive-cifs.yml)
+  ok "Kho luu tru: noi thang toi NAS $NAS_HOST bang CIFS"
 fi
 
 # ---------------------------------------------------------------------------

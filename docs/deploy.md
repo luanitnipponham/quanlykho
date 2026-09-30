@@ -286,6 +286,33 @@ echo 'ARCHIVE_HOST_DIR=/mnt/nas/quanlykho' >> .env
 `deploy.sh` thấy biến đó thì tự thêm [`docker-compose.archive.yml`](../docker-compose.archive.yml)
 vào lệnh compose, gắn thư mục NAS vào container API tại `/archive`.
 
+#### Cách 2: để Docker nối thẳng tới NAS
+
+Dùng khi chạy trên **Windows** (Docker Desktop không bind-mount được ổ mạng đã ánh xạ),
+hoặc khi không muốn đụng tới `/etc/fstab`. Khai báo trong `.env` ở gốc dự án:
+
+```
+NAS_HOST=192.168.4.XX
+NAS_SHARE=ten_share
+NAS_USER=tai_khoan_nas
+NAS_PASS=mat_khau_nas
+```
+
+`deploy.sh` thấy `NAS_HOST` thì thêm [`docker-compose.archive-cifs.yml`](../docker-compose.archive-cifs.yml),
+tạo một Docker volume nối SMB/CIFS thẳng tới NAS. Không cần hệ điều hành gắn trước.
+
+NAS đời cũ có thể cần `NAS_SMB_VERSION=2.1` hoặc `1.0`.
+
+Tạo tệp mốc lần đầu (thay `docker compose` bằng đúng lệnh bạn đang dùng):
+
+```bash
+docker compose exec api touch /archive/.quanlykho-archive
+```
+
+> Cách 1 an toàn hơn khi có thể: mật khẩu NAS nằm trong `/etc/nas-credentials` với quyền
+> `chmod 600`, không phải trong `.env` mà compose đọc. `.env` đã nằm trong `.gitignore`
+> nên không lên GitHub, nhưng vẫn là một chỗ nữa chứa mật khẩu.
+
 Từ đó Admin thấy thêm hai nút ở màn **Phiếu hoàn thành**: biểu tượng hộp lưu trữ để chuyển
 tệp sang NAS và dọn đĩa máy chủ, biểu tượng mũi tên để kéo tệp về lại. Hồ sơ phiếu không
 bị đụng tới nên vẫn tra cứu và báo cáo bình thường.
