@@ -1,0 +1,115 @@
+# Dựng sẵn hai image rồi đẩy lên GitHub Container Registry.
+#
+# Nhờ vậy máy chủ chỉ cần `docker compose pull` (khoảng 30 giây) thay vì build
+# tại chỗ (5-15 phút và cần ~2 GB RAM để biên dịch argon2).
+#
+# Chạy tự động mỗi lần đẩy lên nhánh main, hoặc bấm tay ở tab Actions.
+# Sau lần chạy đầu, vào Packages của repo đặt cả hai package thành Public thì
+# máy chủ kéo được mà không cần đăng nhập.
+
+name: Publish Docker images
+
+on:
+  push:
+    branches: [main]
+    # Sửa tài liệu thì không cần dựng lại image.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'start.bat'
+      - '.github/**'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Kiến trúc CPU cần dựng'
+        default: 'linux/amd64'
+        type: choice
+        options:
+          - 'linux/amd64'
+          - 'linux/amd64,linux/arm64'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: apps/api/Dockerfile
+          - name: web
+            dockerfile: Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Chuẩn hóa tên image về chữ thường
+        id: img
+        run: echo "ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/quanlykho-${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+
+      # Chỉ cần khi dựng cho arm64 trên máy chạy amd64.
+      - name: Bật giả lập kiến trúc khác
+        if: contains(inputs.platforms, 'arm64')
+        uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Đăng nhập GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sinh nhãn cho image
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.img.outputs.ref }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
+
+      - name: Dựng và đẩy
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ inputs.platforms || 'linux/amd64' }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Bộ nhớ đệm của Actions giúp lần dựng sau bỏ qua npm ci nếu lockfile không đổi.
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+
+  summary:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Nhắc bước còn lại
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          {
+            echo "## Đã đẩy image"
+            echo ''
+            echo "- \`ghcr.io/$OWNER/quanlykho-api:latest\`"
+            echo "- \`ghcr.io/$OWNER/quanlykho-web:latest\`"
+            echo ''
+            echo 'Lần đầu tiên: vào trang Packages của repo, mở từng package,'
+            echo 'Package settings → Change visibility → Public.'
+            echo 'Khi đó máy chủ kéo image được mà không cần đăng nhập.'
+            echo ''
+            echo 'Trên máy chủ:'
+            echo '```bash'
+            echo 'cd /opt/quanlykho && PREBUILT=true ./deploy.sh'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
