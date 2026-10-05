@@ -405,7 +405,9 @@ export function ConfigPage() {
             </ul>
           </div>
         </Card>
-        {me.role === 'ADMIN' && (
+        {/* Chỉ hiện khi app chạy bằng dữ liệu trên trình duyệt. Nối PostgreSQL thì
+            store.resetDemo() từ chối thi hành, nên thẻ này chỉ gây nhiễu. */}
+        {me.role === 'ADMIN' && store.mode !== 'server' && (
           <Card className="lg:col-span-2">
             <CardHeader title="Dữ liệu demo" subtitle="Chỉ có ở chế độ chạy trên trình duyệt (không có backend)" />
             <div className="flex flex-wrap items-center gap-3 p-5">
