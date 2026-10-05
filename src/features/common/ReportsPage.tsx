@@ -23,7 +23,7 @@ export function ReportsPage() {
       <PageHeader title="Báo cáo" description="Phạm vi: toàn hệ thống." />
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Phiếu đang xử lý" value={inProgress.length} hint={formatMoney(sum(inProgress, (r) => r.requestedAmount))} />
-        <Stat label="Phiếu hoàn thành" value={completed.length} tone="ok" hint={formatMoney(sum(completed, (r) => r.settlementAmount))} />
+        <Stat label="Phiếu hoàn thành" value={completed.length} tone="ok" hint={formatMoney(sum(completed, (r) => r.requestedAmount))} />
         <Stat label="Đã chi (tạm ứng + đợt cuối)" value={formatMoney(paid)} />
         <Stat label="B8 trễ hạn" value={scope.filter((r) => r.lateInvoice && r.status === 'DOCUMENT_SUPPLEMENT_REQUIRED').length} tone="danger" />
       </div>

@@ -385,15 +385,16 @@ export class RequestsService {
     });
   }
 
-  /** T9 — hoàn tất hồ sơ ĐN thanh toán; quyết toán phải ≥ tạm ứng. */
+  /** T9 — hoàn tất hồ sơ ĐN thanh toán; "Đã chi thêm" không vượt Tổng đề nghị − Tạm ứng. */
   submitSettlement(actor: Actor, id: string, dto: SubmitAdvanceDto & { settlementAmount: number }) {
     return this.tx(actor, id, dto.version, 'SUBMIT_SETTLEMENT', async (tx, pr) => {
       requireTick(dto.confirmed, 'Hoàn tất HS ĐN thanh toán');
       const advance = Number(pr.advanceAmount ?? 0);
-      assertSettlement(advance, dto.settlementAmount);
+      const requested = Number(pr.requestedAmount);
+      assertSettlement(requested, advance, dto.settlementAmount);
       await this.requireSlots(tx, id, ['DELIVERY_RECORD', 'PAYMENT_REQUEST_DOC']);
       await this.move(tx, pr, 'T9', 'FINAL_PAYMENT', actor.id, null, { settlementAmount: new Prisma.Decimal(dto.settlementAmount) });
-      const remaining = remainingOf(advance, dto.settlementAmount);
+      const remaining = remainingOf(requested, advance, dto.settlementAmount);
       await this.notify(tx, [pr.assignedAccountantId], id, 'Phiếu chờ thanh toán (B7)', `${pr.code}: còn lại phải chi ${remaining.toLocaleString('vi-VN')} ₫`);
       await this.audit(tx, actor.id, 'T9', 'payment_request', id, `${pr.code}: hoàn tất HS ĐN thanh toán`);
       return { message: 'Đã gửi kế toán thanh toán (B7)' };
@@ -406,7 +407,7 @@ export class RequestsService {
       requireTick(dto.checkedDocs, 'Đã kiểm tra HS hoàn ứng');
       requireTick(dto.completed, 'HOÀN THÀNH');
       if (!dto.paidDate) fail('ERR_REQUIRED_FIELD', 'Nhập ngày chi');
-      const remaining = remainingOf(Number(pr.advanceAmount ?? 0), pr.settlementAmount ? Number(pr.settlementAmount) : null);
+      const remaining = remainingOf(Number(pr.requestedAmount), Number(pr.advanceAmount ?? 0), pr.settlementAmount ? Number(pr.settlementAmount) : null);
       if (remaining > 0) {
         if (!dto.method) fail('ERR_REQUIRED_FIELD', 'Chọn hình thức chi đợt cuối');
         await this.requireSlots(tx, id, ['FINAL_PROOF'], 'ERR_FINAL_NO_PROOF');
@@ -461,7 +462,7 @@ export class RequestsService {
         dto.toStatus,
         txns.some((t) => t.kind === 'ADVANCE'),
         txns.some((t) => t.kind === 'FINAL'),
-        remainingOf(Number(pr.advanceAmount ?? 0), pr.settlementAmount ? Number(pr.settlementAmount) : null),
+        remainingOf(Number(pr.requestedAmount), Number(pr.advanceAmount ?? 0), pr.settlementAmount ? Number(pr.settlementAmount) : null),
       );
       const extra: Prisma.PaymentRequestUpdateInput = {};
       if ((dto.toStatus === 'ADVANCE_PAYMENT' || dto.toStatus === 'FINAL_PAYMENT') && !pr.assignedAccountantId) {

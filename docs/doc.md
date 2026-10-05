@@ -153,7 +153,9 @@ Ngoài ra Admin sửa dữ liệu, thay file, tick thay và xóa phiếu ở **m
 
 Quy tắc thêm:
 1. Mã phiếu `PYC-YYYYMM-NNNN`, tự sinh dưới khóa dòng của bộ đếm tháng, không sửa.
-2. Còn lại phải chi = Quyết toán − Tạm ứng (hệ thống tự tính). Quyết toán > Tổng đề nghị: cảnh báo cho kế toán ở B7.
+2. Còn lại phải chi = **Tổng đề nghị − Đã chi thêm − Đã tạm ứng** (hệ thống tự tính). Ô "Đã chi thêm" ở B6 nhận 0
+   khi không chi thêm đồng nào ngoài khoản tạm ứng, và không được vượt *Tổng đề nghị − Đã tạm ứng* — vượt là
+   Còn lại phải chi âm, nên chặn ngay tại ô nhập lẫn trong engine (`ERR_SETTLE_OVER_BUDGET`).
 3. **Khóa hồ sơ theo bước:** file và field chỉ sửa khi phiếu ở đúng bước và chưa tick. Riêng ô Hóa đơn mở ở B6, B7, B8.
 4. **Không áp dụng SoD** ngoài B2: hệ thống chỉ chặn việc tự duyệt phiếu mình tạo (T3).
 5. **Hủy phiếu chỉ có ở B1.** Từ B2 trở đi không phòng ban nào hủy được; chỉ Lãnh đạo có Từ chối / Trả lại. A2 của Admin ngoài ràng buộc này.

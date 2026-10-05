@@ -303,7 +303,7 @@ export function buildSeed(hashFor: (userId: string) => string, now: Date): Db {
   s.at(9).create({ title: 'Thuê cẩu tháp tháng 9', categoryId: 'cat-2', vendorId: 'ven-3', requestedAmount: 120_000_000 }).b1Files('cau_thap');
   s.toB3().toB4(50_000_000, 'cau_thap').at(8).toB5('MEDIUM').toB6('cau_thap', 8);
 
-  // 8. B7 — settlement above the requested total (warning for the accountant), invoice still missing
+  // 8. B7 — đã chi thêm 40tr, còn lại phải chi 20tr, hóa đơn vẫn thiếu
   s.at(14).create({ title: 'Gạch block xây tường bao', vendorId: 'ven-2', requestedAmount: 120_000_000 }).b1Files('gach_block');
   s.toB3()
     .toB4(60_000_000, 'gach_block')
@@ -311,7 +311,7 @@ export function buildSeed(hashFor: (userId: string) => string, now: Date): Db {
     .toB5('MEDIUM')
     .toB6('gach_block', 13)
     .at(2)
-    .toB7(126_500_000, 'gach_block', false);
+    .toB7(40_000_000, 'gach_block', false);
 
   // 9. B8 — overdue invoice (the daily job raises the late flag)
   s.at(20).create({ title: 'Cát vàng bê tông – 500 m³', vendorId: 'ven-2', requestedAmount: 175_000_000 }).b1Files('cat_vang');
@@ -321,7 +321,7 @@ export function buildSeed(hashFor: (userId: string) => string, now: Date): Db {
     .toB5('LOW')
     .toB6('cat_vang', 19)
     .at(16)
-    .toB7(172_000_000, 'cat_vang', false)
+    .toB7(60_000_000, 'cat_vang', false)
     .at(14)
     .finish('cat_vang', 14);
 
@@ -333,7 +333,7 @@ export function buildSeed(hashFor: (userId: string) => string, now: Date): Db {
     .toB5('LOW')
     .toB6('ve_sinh', 24)
     .at(21)
-    .toB7(18_000_000, 've_sinh', false)
+    .toB7(9_000_000, 've_sinh', false)
     .at(20)
     .finish('ve_sinh', 20);
 
@@ -349,7 +349,7 @@ export function buildSeed(hashFor: (userId: string) => string, now: Date): Db {
 
   // Comments with @mentions on the two requests still in flight
   const b7 = s.db.requests.find((r) => r.status === 'FINAL_PAYMENT')!;
-  s.do(KT, { type: 'COMMENT', id: b7.id, content: '@cungung Quyết toán vượt tổng đề nghị 6,5 triệu, bổ sung phụ lục khối lượng giúp mình nhé.' });
+  s.do(KT, { type: 'COMMENT', id: b7.id, content: '@cungung Phần đã chi thêm 40 triệu nhờ em bổ sung phụ lục khối lượng giúp mình nhé.' });
   const b8 = s.db.requests.find((r) => r.status === 'DOCUMENT_SUPPLEMENT_REQUIRED')!;
   s.do(KT, { type: 'COMMENT', id: b8.id, content: '@cungung NCC đã xuất hóa đơn chưa em? Phiếu đã quá hạn bổ sung.' });
 

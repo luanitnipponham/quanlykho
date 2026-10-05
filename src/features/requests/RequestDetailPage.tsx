@@ -6,6 +6,7 @@ import { store } from '../../data/store';
 import { METHOD_LABEL, PRIORITY_LABEL, STATUS_LABEL, STATUS_STEP, TIMELINE_LABEL, WORKING_STATUSES } from '../../domain/constants';
 import { can, isAdmin, leaders as allLeaders } from '../../domain/permissions';
 import type { PaymentRequest, Status } from '../../domain/types';
+import { remainingOf } from '../../domain/workflow';
 import { cx, formatDate, formatDateTime, formatMoney, timeAgo } from '../../lib/format';
 import { masterName, userName } from '../../lib/lookup';
 import { Button, Card, CardHeader, EmptyState, Field, Modal, Notice, Select, Textarea } from '../../ui/primitives';
@@ -55,18 +56,12 @@ export function RequestDetailPage({ id }: { id: string }) {
           </div>
           <div className="text-right">
             <span className="block text-xs text-slate-500">
-              {pr.status === 'COMPLETED'
-                ? 'Giá trị quyết toán (Đã tất toán)'
-                : pr.settlementAmount !== null
-                  ? 'Giá trị quyết toán'
-                  : 'Tổng đề nghị'}
+              {pr.status === 'COMPLETED' ? 'Tổng đề nghị (Đã tất toán)' : 'Tổng đề nghị'}
             </span>
-            <span className="text-2xl font-semibold tabular-nums text-slate-900">
-              {formatMoney(pr.settlementAmount ?? pr.requestedAmount)}
-            </span>
-            {pr.settlementAmount !== null && pr.settlementAmount !== pr.requestedAmount && (
+            <span className="text-2xl font-semibold tabular-nums text-slate-900">{formatMoney(pr.requestedAmount)}</span>
+            {pr.settlementAmount !== null && (
               <span className="block text-xs text-slate-400">
-                Đề nghị ban đầu: {formatMoney(pr.requestedAmount)}
+                Đã chi thêm: {formatMoney(pr.settlementAmount)} · Còn lại phải chi: {formatMoney(remainingOf(pr))}
               </span>
             )}
           </div>

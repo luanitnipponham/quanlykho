@@ -283,20 +283,27 @@ function requireLeaders(db: Db, pr: PaymentRequest): User[] {
 }
 
 // ---------------------------------------------------------------------------
-// Settlement (workflow §6.2): Còn lại phải chi = Quyết toán − Tạm ứng.
-// Quyết toán < Tạm ứng is refused at the B6 input and by the engine.
+// Số tiền ở B6: Còn lại phải chi = Tổng đề nghị − Đã chi thêm − Đã tạm ứng.
+// Cột settlementAmount giữ nguyên tên nhưng nay mang nghĩa "Đã chi thêm".
 // ---------------------------------------------------------------------------
 
 export function remainingOf(pr: PaymentRequest): number {
   if (pr.settlementAmount === null) return 0;
-  return Math.max(0, pr.settlementAmount - (pr.advanceAmount ?? 0));
+  return Math.max(0, pr.requestedAmount - pr.settlementAmount - (pr.advanceAmount ?? 0));
 }
 
-/** Validation message for the B6 settlement input, or null when the value is acceptable. */
-export function settlementError(advance: number, settlement: number): string | null {
-  if (!Number.isFinite(settlement) || settlement <= 0) return null;
-  if (settlement < advance) {
-    return `Giá trị quyết toán không được nhỏ hơn số đã tạm ứng (${advance.toLocaleString('vi-VN')} ₫)`;
+/** Trần của ô "Đã chi thêm"; vượt mức này thì Còn lại phải chi sẽ âm. */
+export function spendBudget(requested: number, advance: number): number {
+  return Math.max(0, requested - advance);
+}
+
+/** Thông báo lỗi cho ô "Đã chi thêm" ở B6, hoặc null khi giá trị hợp lệ. */
+export function settlementError(requested: number, advance: number, extra: number): string | null {
+  if (!Number.isFinite(extra)) return null;
+  if (extra < 0) return 'Đã chi thêm không được âm';
+  const budget = spendBudget(requested, advance);
+  if (extra > budget) {
+    return `Đã chi thêm không được lớn hơn ${budget.toLocaleString('vi-VN')} ₫ (Tổng đề nghị − Đã tạm ứng)`;
   }
   return null;
 }
@@ -573,10 +580,12 @@ function apply(db: Db, actor: User, action: WorkflowAction, now: Date): Workflow
       const pr = guard(db, actor, action.id, action.version, 'SUBMIT_SETTLEMENT');
       requireTick(action.confirmed, 'Hoàn tất HS ĐN thanh toán');
       const amt = action.settlementAmount;
-      if (!Number.isFinite(amt) || amt <= 0) fail('ERR_REQUIRED_FIELD', 'Nhập Giá trị quyết toán');
+      // 0 là hợp lệ: không chi thêm đồng nào ngoài khoản đã tạm ứng.
+      if (!Number.isFinite(amt) || amt < 0) fail('ERR_REQUIRED_FIELD', 'Nhập số tiền Đã chi thêm (0 nếu không chi thêm)');
       const adv = pr.advanceAmount ?? 0;
-      if (amt < adv) {
-        fail('ERR_SETTLE_BELOW_ADV', `Giá trị quyết toán không được nhỏ hơn số đã tạm ứng (${adv.toLocaleString('vi-VN')} ₫)`);
+      const budget = spendBudget(pr.requestedAmount, adv);
+      if (amt > budget) {
+        fail('ERR_SETTLE_OVER_BUDGET', `Đã chi thêm không được lớn hơn ${budget.toLocaleString('vi-VN')} ₫ (Tổng đề nghị − Đã tạm ứng)`);
       }
       requireSlots(db, pr, ['DELIVERY_RECORD', 'PAYMENT_REQUEST_DOC']);
       pr.settlementAmount = amt;

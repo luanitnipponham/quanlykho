@@ -89,11 +89,11 @@ class World {
     this.attach(KT, 'ADVANCE_PROOF');
     this.t(KT, { type: 'PAY_ADVANCE', checkedDocs: true, paid: true, method: 'TRANSFER', paidDate: '2026-09-23' });
   }
-  toB7(settlement = 100_000_000) {
+  toB7(extraSpent = 20_000_000) {
     this.toB6();
     this.attach(CU, 'DELIVERY_RECORD');
     this.attach(CU, 'PAYMENT_REQUEST_DOC');
-    this.t(CU, { type: 'SUBMIT_SETTLEMENT', confirmed: true, settlementAmount: settlement });
+    this.t(CU, { type: 'SUBMIT_SETTLEMENT', confirmed: true, settlementAmount: extraSpent });
   }
 }
 
@@ -120,7 +120,7 @@ describe('Happy path B1 → B8 → COMPLETED', () => {
       w.pr.transactions.map((t) => [t.kind, t.amount]),
       [
         ['ADVANCE', 40_000_000],
-        ['FINAL', 60_000_000],
+        ['FINAL', 40_000_000], // 100tr − 20tr đã chi thêm − 40tr tạm ứng
       ],
     );
 
@@ -140,8 +140,8 @@ describe('Happy path B1 → B8 → COMPLETED', () => {
     w.attach(CU, 'DELIVERY_RECORD');
     w.attach(CU, 'PAYMENT_REQUEST_DOC');
     w.attach(CU, 'INVOICE');
-    w.t(CU, { type: 'SUBMIT_SETTLEMENT', confirmed: true, settlementAmount: 40_000_000 });
-    // remaining = 0 → no final proof required
+    w.t(CU, { type: 'SUBMIT_SETTLEMENT', confirmed: true, settlementAmount: 60_000_000 });
+    // Đã chi thêm 60tr + tạm ứng 40tr = đúng Tổng đề nghị 100tr → remaining = 0, không cần UNC
     const res = w.t(KT, { type: 'PAY_FINAL', checkedDocs: true, completed: true, method: null, paidDate: '2026-09-24' });
     assert.equal(res.status, 'COMPLETED');
     assert.equal(w.pr.transactions.length, 1);
@@ -283,25 +283,31 @@ describe('B3, B4 and B5', () => {
 });
 
 describe('B6 and B7 amounts', () => {
-  it('refuses settlement < advance at the input and in the engine (workflow §6.2)', () => {
-    assert.equal(settlementError(40_000_000, 55_000_000), null);
-    assert.equal(settlementError(40_000_000, 40_000_000), null);
-    assert.match(settlementError(40_000_000, 39_999_999) ?? '', /không được nhỏ hơn/);
+  it('Đã chi thêm bị chặn khi vượt trần Tổng đề nghị − Tạm ứng', () => {
+    // Phiếu mẫu: Tổng đề nghị 100tr, đã tạm ứng 40tr → trần 60tr.
+    assert.equal(settlementError(100_000_000, 40_000_000, 0), null);
+    assert.equal(settlementError(100_000_000, 40_000_000, 60_000_000), null);
+    assert.match(settlementError(100_000_000, 40_000_000, 60_000_001) ?? '', /không được lớn hơn/);
+    assert.match(settlementError(100_000_000, 40_000_000, -1) ?? '', /không được âm/);
 
     const w = new World();
     w.toB6();
     w.attach(CU, 'DELIVERY_RECORD');
     w.attach(CU, 'PAYMENT_REQUEST_DOC');
-    expectCode(() => w.t(CU, { type: 'SUBMIT_SETTLEMENT', confirmed: true, settlementAmount: 39_999_999 }), 'ERR_SETTLE_BELOW_ADV');
+    expectCode(
+      () => w.t(CU, { type: 'SUBMIT_SETTLEMENT', confirmed: true, settlementAmount: 60_000_001 }),
+      'ERR_SETTLE_OVER_BUDGET',
+    );
     assert.equal(w.pr.status, 'AFTER_ADVANCE');
-    w.t(CU, { type: 'SUBMIT_SETTLEMENT', confirmed: true, settlementAmount: 55_000_000 });
+    w.t(CU, { type: 'SUBMIT_SETTLEMENT', confirmed: true, settlementAmount: 15_000_000 });
     assert.equal(w.pr.status, 'FINAL_PAYMENT');
-    assert.equal(remainingOf(w.pr), 15_000_000);
+    // Còn lại phải chi = 100tr − 15tr đã chi thêm − 40tr tạm ứng
+    assert.equal(remainingOf(w.pr), 45_000_000);
   });
 
   it('remaining > 0 requires the final UNC at B7', () => {
     const w = new World();
-    w.toB7(120_000_000);
+    w.toB7(20_000_000);
     expectCode(
       () => w.t(KT, { type: 'PAY_FINAL', checkedDocs: true, completed: true, method: 'TRANSFER', paidDate: '2026-09-24' }),
       'ERR_FINAL_NO_PROOF',

@@ -20,7 +20,7 @@
 | Phân quyền 2 tầng | `RolesGuard` theo vai trò + `authorize()` theo trạng thái và phạm vi dữ liệu | ✅ |
 | Tách biệt nhiệm vụ ở B2 | `ERR_SELF_APPROVAL` khi người duyệt trùng người tạo | ✅ |
 | Chống xử lý trùng | Mọi transition trong một transaction, kiểm tra và tăng `version` | ✅ |
-| Toàn vẹn tiền | `NUMERIC(18,2)`; ràng buộc `0 < tạm ứng ≤ tổng`, `quyết toán ≥ tạm ứng` | ✅ |
+| Toàn vẹn tiền | `NUMERIC(18,2)`; ràng buộc `0 < tạm ứng ≤ tổng`, `0 ≤ đã chi thêm ≤ tổng − tạm ứng` | ✅ |
 | Sinh mã phiếu | `upsert ... increment` trên `request_sequences`, an toàn khi chạy song song | ✅ |
 | Chống path traversal | Tên file chuẩn hóa về `[A-Za-z0-9_-]`, không còn `..` hay `/`; `storage_path` `UNIQUE` | ✅ |
 | Giới hạn upload | Whitelist định dạng + 25 MB, kiểm tra ở cả hai tầng | ✅ |

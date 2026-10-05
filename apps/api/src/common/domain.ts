@@ -220,16 +220,29 @@ export function canUploadToSlot(actor: Actor, pr: RequestScope, slot: Slot): boo
 // Amounts (workflow §6.2)
 // ---------------------------------------------------------------------------
 
-export function remainingOf(advance: number, settlement: number | null): number {
-  if (settlement === null) return 0;
-  return Math.max(0, settlement - advance);
+/**
+ * Còn lại phải chi = Tổng đề nghị − Đã chi thêm − Đã tạm ứng.
+ * Cột settlement_amount giữ nguyên tên nhưng nay mang nghĩa "Đã chi thêm".
+ */
+export function remainingOf(requested: number, advance: number, extraSpent: number | null): number {
+  if (extraSpent === null) return 0;
+  return Math.max(0, requested - extraSpent - advance);
 }
 
-/** Quyết toán < Tạm ứng is refused; the UI blocks it at the input too. */
-export function assertSettlement(advance: number, settlement: number): void {
-  if (!Number.isFinite(settlement) || settlement <= 0) fail('ERR_REQUIRED_FIELD', 'Nhập Giá trị quyết toán');
-  if (settlement < advance) {
-    fail('ERR_SETTLE_BELOW_ADV', `Giá trị quyết toán không được nhỏ hơn số đã tạm ứng (${advance.toLocaleString('vi-VN')} ₫)`);
+/** Trần của ô "Đã chi thêm"; vượt mức này thì Còn lại phải chi sẽ âm. */
+export function spendBudget(requested: number, advance: number): number {
+  return Math.max(0, requested - advance);
+}
+
+/** Vượt trần bị từ chối; giao diện cũng chặn ngay tại ô nhập. */
+export function assertSettlement(requested: number, advance: number, extraSpent: number): void {
+  // 0 là hợp lệ: không chi thêm đồng nào ngoài khoản đã tạm ứng.
+  if (!Number.isFinite(extraSpent) || extraSpent < 0) {
+    fail('ERR_REQUIRED_FIELD', 'Nhập số tiền Đã chi thêm (0 nếu không chi thêm)');
+  }
+  const budget = spendBudget(requested, advance);
+  if (extraSpent > budget) {
+    fail('ERR_SETTLE_OVER_BUDGET', `Đã chi thêm không được lớn hơn ${budget.toLocaleString('vi-VN')} ₫ (Tổng đề nghị − Đã tạm ứng)`);
   }
 }
 

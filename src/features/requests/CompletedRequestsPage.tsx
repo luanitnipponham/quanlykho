@@ -184,7 +184,7 @@ export function CompletedRequestsPage() {
                   <th className="px-4 py-3 font-medium">Phiếu yêu cầu</th>
                   <th className="px-4 py-3 font-medium">NV Cung ứng</th>
                   <th className="px-4 py-3 font-medium">Kế toán phụ trách</th>
-                  <th className="px-4 py-3 text-right font-medium">Quyết toán</th>
+                  <th className="px-4 py-3 text-right font-medium">Tổng đề nghị</th>
                   <th className="px-4 py-3 font-medium">Kiểm tra chứng từ</th>
                   <th className="px-4 py-3 text-right font-medium">Thao tác</th>
                 </tr>
@@ -237,13 +237,14 @@ export function CompletedRequestsPage() {
 
                       {/* Amounts */}
                       <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-                        <p className="font-semibold text-slate-900">
-                          {formatMoney(pr.settlementAmount ?? pr.requestedAmount)}
-                        </p>
+                        <p className="font-semibold text-slate-900">{formatMoney(pr.requestedAmount)}</p>
                         <p className="text-xs text-slate-500">
                           {pr.advanceAmount !== null && pr.advanceAmount > 0 ? (
                             <>
                               <span>Đã TƯ: {formatMoney(pr.advanceAmount)}</span>
+                              {pr.settlementAmount !== null && pr.settlementAmount > 0 && (
+                                <span> · Chi thêm: {formatMoney(pr.settlementAmount)}</span>
+                              )}
                               <span className="text-emerald-600 font-medium"> · Đã tất toán</span>
                             </>
                           ) : (

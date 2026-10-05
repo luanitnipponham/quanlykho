@@ -8,7 +8,7 @@ import { METHOD_LABEL, PRIORITY_LABEL, SLOT_DEF, STATUS_LABEL, STATUS_STEP } fro
 import { invoiceCountdown, toDateKey } from '../../domain/dates';
 import { can, canManageMaster, leaders as allLeaders, theAccountant, type RequestActionKey } from '../../domain/permissions';
 import type { PaymentMethod, PaymentRequest, Priority, Slot } from '../../domain/types';
-import { remainingOf, settlementError } from '../../domain/workflow';
+import { remainingOf, settlementError, spendBudget } from '../../domain/workflow';
 import { cx, formatDate, formatMoney } from '../../lib/format';
 import { masterName, userName } from '../../lib/lookup';
 import { Button, Card, Checkpoint, Field, Input, Modal, MoneyInput, Notice, Select, Textarea } from '../../ui/primitives';
@@ -501,15 +501,21 @@ function Settlement({ pr }: { pr: PaymentRequest }) {
   const [amount, setAmount] = useState(pr.settlementAmount ?? 0);
   const [tick, setTick] = useState(false);
   const adv = pr.advanceAmount ?? 0;
-  // Quyết toán < Tạm ứng bị báo lỗi ngay tại ô nhập và khóa nút gửi (workflow §6.2).
-  const amountError = settlementError(adv, amount);
-  const over = amount > pr.requestedAmount;
-  const remaining = Math.max(0, amount - adv);
+  // Vượt trần bị báo lỗi ngay tại ô nhập và khóa nút gửi, để Còn lại phải chi không âm.
+  const amountError = settlementError(pr.requestedAmount, adv, amount);
+  const budget = spendBudget(pr.requestedAmount, adv);
+  const remaining = Math.max(0, pr.requestedAmount - amount - adv);
 
   return (
     <Panel title="B6 · Hoàn tất hồ sơ đề nghị thanh toán">
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Giá trị quyết toán" required htmlFor="settle" error={amountError ?? undefined}>
+        <Field
+          label="Đã chi thêm"
+          required
+          htmlFor="settle"
+          hint={`Tối đa ${formatMoney(budget)} — để 0 nếu không chi thêm ngoài khoản tạm ứng`}
+          error={amountError ?? undefined}
+        >
           <MoneyInput id="settle" value={amount} onChange={setAmount} />
         </Field>
         <div className="rounded-lg bg-slate-50 px-4 py-2.5">
@@ -521,8 +527,11 @@ function Settlement({ pr }: { pr: PaymentRequest }) {
           <p className="font-semibold tabular-nums">{amountError ? '—' : formatMoney(remaining)}</p>
         </div>
       </div>
-      {over && !amountError && (
-        <Notice tone="warn">Quyết toán vượt Tổng đề nghị ({formatMoney(pr.requestedAmount)}) — kế toán sẽ thấy cảnh báo ở B7.</Notice>
+      {!amountError && remaining === 0 && (
+        <Notice tone="warn">
+          Còn lại phải chi bằng 0 — khoản tạm ứng cộng phần đã chi thêm vừa đủ Tổng đề nghị, kế toán sẽ không chi thêm
+          đồng nào ở B7.
+        </Notice>
       )}
       <div className="grid gap-2 sm:grid-cols-3">
         <AttachmentSlot pr={pr} slot="DELIVERY_RECORD" compact />
@@ -557,11 +566,12 @@ function Settlement({ pr }: { pr: PaymentRequest }) {
 // ---------------------------------------------------------------------------
 
 export function AmountsTable({ pr }: { pr: PaymentRequest }) {
-  const over = pr.settlementAmount !== null && pr.settlementAmount > pr.requestedAmount;
+  const over =
+    pr.settlementAmount !== null && pr.settlementAmount > spendBudget(pr.requestedAmount, pr.advanceAmount ?? 0);
   const cells: [string, number | null, boolean?][] = [
     ['Tổng đề nghị', pr.requestedAmount],
     ['Đã tạm ứng', pr.advanceAmount],
-    ['Quyết toán', pr.settlementAmount, over],
+    ['Đã chi thêm', pr.settlementAmount, over],
     ['Còn lại phải chi', pr.settlementAmount !== null ? remainingOf(pr) : null],
   ];
   return (

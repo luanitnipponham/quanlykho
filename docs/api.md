@@ -17,7 +17,7 @@
 ```json
 {
   "success": false,
-  "error": { "code": "ERR_SETTLE_BELOW_ADV", "message": "Giá trị quyết toán không được nhỏ hơn số đã tạm ứng (40.000.000 ₫)" },
+  "error": { "code": "ERR_SETTLE_OVER_BUDGET", "message": "Đã chi thêm không được lớn hơn 12.000.000 ₫ (Tổng đề nghị − Đã tạm ứng)" },
   "meta": { "timestamp": "2026-09-29T04:12:00.000Z" }
 }
 ```
@@ -79,7 +79,7 @@ Body tạo phiếu:
 | `POST` | `/payment-requests/:id/submit-advance` | T6 | ADVANCE_PREPARATION → COORDINATION | `{ confirmed: true, advanceAmount }` |
 | `POST` | `/payment-requests/:id/finance-approve` | T7 | COORDINATION → ADVANCE_PAYMENT | `{ confirmed: true, priority, accountantNameId, note? }` |
 | `POST` | `/payment-requests/:id/pay-advance` | T8 | ADVANCE_PAYMENT → AFTER_ADVANCE | `{ checkedDocs: true, paid: true, method, paidDate }` |
-| `POST` | `/payment-requests/:id/submit-settlement` | T9 | AFTER_ADVANCE → FINAL_PAYMENT | `{ confirmed: true, settlementAmount }` |
+| `POST` | `/payment-requests/:id/submit-settlement` | T9 | AFTER_ADVANCE → FINAL_PAYMENT | `{ confirmed: true, settlementAmount }` — nay mang nghĩa **Đã chi thêm** |
 | `POST` | `/payment-requests/:id/pay-final` | T10→T11/T12 | FINAL_PAYMENT → COMPLETED \| DOCUMENT_SUPPLEMENT_REQUIRED | `{ checkedDocs: true, completed: true, method?, paidDate }` |
 | `POST` | `/payment-requests/:id/complete-invoice` | T13 | DOCUMENT_SUPPLEMENT_REQUIRED → COMPLETED | — |
 
