@@ -209,8 +209,8 @@ export function FinanceMonitorPage() {
       </div>
       {accountant && (
         <p className="mb-4 text-sm text-slate-600">
-          Kế toán phụ trách: <b className="text-slate-900">{accountant.fullName}</b> ({accountant.username}) — tên người
-          nhận từng phiếu hiện trong cột Kế toán phụ trách ở bảng bên dưới
+          Tài khoản Kế toán: <b className="text-slate-900">{accountant.fullName}</b> ({accountant.username}) — người
+          bạn giao từng phiếu ở B4 hiện trong cột <b className="text-slate-900">NV kế toán</b> bên dưới
         </p>
       )}
       {items.length === 0 ? (
@@ -225,7 +225,7 @@ export function FinanceMonitorPage() {
             return (
               <Card key={s}>
                 <CardHeader title={`${STATUS_STEP[s]} · ${STATUS_LABEL[s]}`} subtitle={`${list.length} phiếu`} />
-                <RequestTable requests={list} columns={['requester', 'priority', 'amounts']} searchable={false} />
+                <RequestTable requests={list} columns={['requester', 'accountant', 'priority', 'amounts']} searchable={false} />
               </Card>
             );
           })}

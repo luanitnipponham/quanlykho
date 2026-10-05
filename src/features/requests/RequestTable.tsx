@@ -39,7 +39,14 @@ export function RequestTable({
     const k = q.trim().toLowerCase();
     if (!k) return requests;
     return requests.filter((r) =>
-      [r.code, r.title, masterName(db, 'projects', r.projectId), masterName(db, 'vendors', r.vendorId), userName(db, r.assignedRequesterId)]
+      [
+        r.code,
+        r.title,
+        masterName(db, 'projects', r.projectId),
+        masterName(db, 'vendors', r.vendorId),
+        userName(db, r.assignedRequesterId),
+        masterName(db, 'accountantNames', r.accountantNameId),
+      ]
         .join(' ')
         .toLowerCase()
         .includes(k),
@@ -91,7 +98,7 @@ export function RequestTable({
                   )}
                   <th className="px-4 py-2.5 font-medium">Phiếu</th>
                   {columns.includes('requester') && <th className="px-4 py-2.5 font-medium">NV cung ứng</th>}
-                  {columns.includes('accountant') && <th className="px-4 py-2.5 font-medium">Kế toán</th>}
+                  {columns.includes('accountant') && <th className="px-4 py-2.5 font-medium">NV kế toán</th>}
                   <th className="px-4 py-2.5 text-right font-medium">Số tiền</th>
                   <th className="px-4 py-2.5 font-medium">Trạng thái</th>
                   <th className="px-4 py-2.5 font-medium">Cập nhật</th>
@@ -122,7 +129,18 @@ export function RequestTable({
                       <p className="truncate text-xs text-slate-500">{masterName(db, 'projects', r.projectId)}</p>
                     </td>
                     {columns.includes('requester') && <td className="px-4 py-3 text-slate-600">{userName(db, r.assignedRequesterId)}</td>}
-                    {columns.includes('accountant') && <td className="px-4 py-3 text-slate-600">{userName(db, r.assignedAccountantId)}</td>}
+                    {columns.includes('accountant') && (
+                      <td className="px-4 py-3 text-slate-600">
+                        {r.accountantNameId ? (
+                          masterName(db, 'accountantNames', r.accountantNameId)
+                        ) : r.assignedAccountantId ? (
+                          // Phiếu qua B4 trước khi có ô chỉ định: lùi về tên tài khoản.
+                          userName(db, r.assignedAccountantId)
+                        ) : (
+                          <span className="text-slate-400">Chưa phân công</span>
+                        )}
+                      </td>
+                    )}
                     <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
                       <p className="font-medium text-slate-900">{formatMoney(r.settlementAmount ?? r.requestedAmount)}</p>
                       {columns.includes('amounts') && (
