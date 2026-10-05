@@ -1,20 +1,49 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { KeyRound, LogIn } from 'lucide-react';
+import { api } from '../../data/api';
 import { store } from '../../data/store';
 import { DEFAULT_PASSWORD_HINT, ROLE_LABEL } from '../../domain/constants';
 import { SEED_ACCOUNTS } from '../../domain/seed';
+import type { Role } from '../../domain/types';
 import { DomainError } from '../../domain/errors';
 import { Button, Field, Input } from '../../ui/primitives';
 
+interface Suggested {
+  username: string;
+  fullName: string;
+  role: Role;
+}
+
 // Tài khoản Admin không hiện ở danh sách gợi ý: người test chỉ dùng 4 phòng ban.
 // Vẫn đăng nhập được bằng cách gõ tay tên đăng nhập.
-const DEMO_ACCOUNTS = SEED_ACCOUNTS.filter((a) => a.role !== 'ADMIN');
+// Đây chỉ là bản dự phòng cho chế độ chạy trên trình duyệt; nối backend thì
+// danh sách được đọc từ PostgreSQL để họ tên luôn khớp với Quản lý người dùng.
+const FALLBACK_ACCOUNTS: Suggested[] = SEED_ACCOUNTS.filter((a) => a.role !== 'ADMIN').map((a) => ({
+  username: a.username,
+  fullName: a.fullName,
+  role: a.role,
+}));
 
 export function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [accounts, setAccounts] = useState<Suggested[]>(FALLBACK_ACCOUNTS);
+
+  useEffect(() => {
+    let alive = true;
+    // Backend không chạy thì giữ nguyên bản dự phòng, không báo lỗi ở màn đăng nhập.
+    api
+      .accounts()
+      .then((rows) => {
+        if (alive && rows.length) setAccounts(rows.filter((r) => r.role !== 'ADMIN'));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -68,8 +97,8 @@ export function LoginPage() {
             Mật khẩu chung: <code className="rounded bg-slate-100 px-1 font-mono">{DEFAULT_PASSWORD_HINT}</code>. Bấm để điền sẵn.
           </p>
           <ul className="mt-4 divide-y divide-slate-100">
-            {DEMO_ACCOUNTS.map((a) => (
-              <li key={a.id}>
+            {accounts.map((a) => (
+              <li key={a.username}>
                 <button
                   type="button"
                   onClick={() => {

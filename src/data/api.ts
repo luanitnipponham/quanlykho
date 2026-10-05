@@ -1,6 +1,6 @@
 // REST client for the v3.4 backend (docs/api.md). Requests go through the Vite proxy at /api.
 import { DomainError, type ErrorCode } from '../domain/errors';
-import type { Status } from '../domain/types';
+import type { Role, Status } from '../domain/types';
 
 const BASE = '/api/v1';
 const ACCESS_KEY = 'pyc.access';
@@ -126,6 +126,9 @@ export const api = {
   setUserStatus: (id: string, status: 'ACTIVE' | 'LOCKED') => post(`/users/${id}/status`, { status }),
   resetPassword: (id: string, password: string) => post(`/users/${id}/reset-password`, { password }),
   deleteUser: (id: string) => del(`/users/${id}`),
+
+  /** Công khai: danh sách gợi ý ở màn đăng nhập, đọc thẳng từ database. */
+  accounts: () => get<{ username: string; fullName: string; role: Role }[]>('/auth/accounts'),
 
   master: (kind: string) => get<unknown[]>(`/master-data/${kind}`),
   createMaster: (kind: string, body: unknown) => post(`/master-data/${kind}`, body),

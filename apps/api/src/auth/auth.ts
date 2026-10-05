@@ -9,7 +9,7 @@ import * as crypto from 'node:crypto';
 import { IsString, MinLength } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrentUser, Public } from '../common/common';
-import { DomainException, ROLE_DEPT_KIND, fail, type Actor } from '../common/domain';
+import { DomainException, ROLE_DEPT_KIND, fail, type Actor, type Role } from '../common/domain';
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-change-me';
 const ACCESS_TTL = process.env.JWT_EXPIRES_IN || '15m';
@@ -53,6 +53,18 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
   ) {}
+
+  /**
+   * Tài khoản để gợi ý ở màn đăng nhập. Đọc thẳng từ PostgreSQL nên Admin đổi
+   * họ tên là màn đăng nhập đổi theo. Bỏ Admin ra khỏi danh sách.
+   */
+  suggestedAccounts(): Promise<SuggestedAccount[]> {
+    return this.prisma.user.findMany({
+      where: { status: 'ACTIVE', NOT: { role: 'ADMIN' } },
+      orderBy: { username: 'asc' },
+      select: { username: true, fullName: true, role: true },
+    }) as Promise<SuggestedAccount[]>;
+  }
 
   private async config() {
     return (
@@ -183,6 +195,13 @@ export function departmentKindForRole(role: Actor['role']) {
   return ROLE_DEPT_KIND[role];
 }
 
+/** Hồ sơ rút gọn cho danh sách gợi ý ở màn đăng nhập. */
+export interface SuggestedAccount {
+  username: string;
+  fullName: string;
+  role: Role;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
@@ -202,6 +221,16 @@ export class AuthController {
   @Post('refresh')
   refresh(@Body() dto: RefreshDto) {
     return this.auth.refresh(dto);
+  }
+
+  /**
+   * Danh sách tài khoản gợi ý ở màn đăng nhập. Công khai vì phải đọc trước khi
+   * đăng nhập; chỉ trả tài khoản đang hoạt động và không gồm Admin.
+   */
+  @Public()
+  @Get('accounts')
+  accounts() {
+    return this.auth.suggestedAccounts();
   }
 
   @Get('me')
