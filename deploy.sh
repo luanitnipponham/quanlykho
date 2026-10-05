@@ -21,6 +21,7 @@
 #   NO_GIT=true      bo qua buoc dong bo ma nguon
 #   NO_PRUNE=true    bo qua buoc don bo nho dem
 #   SEED_DEMO=true   nap them danh muc va phieu mau de xem thu
+#   RESET_DATA=XOA   xoa sach phieu, danh muc va tep dinh kem truoc khi chay
 
 set -euo pipefail
 
@@ -28,6 +29,15 @@ REPO_URL="https://github.com/luanitnipponham/quanlykho.git"
 # Gia tri nguoi dung truyen vao dong lenh; neu khong co thi lat sau se doc tu .env
 # cua du an (chinh file ma docker compose doc), roi moi lay mac dinh 80.
 HTTP_PORT_ARG="${HTTP_PORT:-}"
+
+# Xoa du lieu la viec khong hoan tac duoc. Bat go dung chu XOA chu khong phai
+# "true": mot lan go nham tren may chu that la mat sach phieu. Kiem tra ngay tu
+# dau de khong phai cho het ca quy trinh moi bao sai.
+RESET_DATA="${RESET_DATA:-}"
+if [ -n "$RESET_DATA" ] && [ "$RESET_DATA" != "XOA" ]; then
+  echo "LOI: RESET_DATA chi nhan gia tri XOA. Vi du: RESET_DATA=XOA ./deploy.sh" >&2
+  exit 1
+fi
 
 RED=$'\033[31m'
 GREEN=$'\033[32m'
@@ -293,6 +303,16 @@ done
 
 if [ "$READY" -eq 1 ]; then
   ok "Giao dien tra 200, API tra 401 (dung — dang doi token)"
+  if [ "$RESET_DATA" = "XOA" ]; then
+    warn "Dang xoa du lieu nghiep vu theo yeu cau RESET_DATA=XOA"
+    # Cung script ma may Windows dung: xoa phieu, lich su, dinh kem (ca tep tren
+    # dia), danh muc va bo dem ma phieu. Giu lai tai khoan, phong ban, ngay le.
+    if "${COMPOSE[@]}" exec -T api node dist/reset-data.js; then
+      ok "Da xoa du lieu nghiep vu; tai khoan va phong ban van con"
+    else
+      die "Khong xoa duoc du lieu. Xem log phia tren."
+    fi
+  fi
   if [ "${SEED_DEMO:-}" = "true" ]; then
     if "${COMPOSE[@]}" exec -T -e SEED_DEMO=true api node dist/seed.js >/dev/null 2>&1; then
       ok "Da nap danh muc va phieu mau"

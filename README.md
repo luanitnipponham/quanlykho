@@ -67,6 +67,18 @@ git fetch origin main && git reset --hard origin/main
 PREBUILT=true ./deploy.sh
 ```
 
+Muốn máy chủ bắt đầu lại với dữ liệu trắng — xoá hết phiếu, danh mục và tệp
+đính kèm rồi chạy mã nguồn mới:
+
+```bash
+cd /opt/quanlykho && git fetch origin main && git reset --hard origin/main && RESET_DATA=XOA PREBUILT=true ./deploy.sh
+```
+
+Phải gõ đúng chữ `XOA`, không nhận `true` — một lần gõ nhầm trên máy chủ thật
+là mất sạch phiếu. Thao tác này **giữ lại** tài khoản đăng nhập, 4 phòng ban,
+ngày nghỉ lễ và cấu hình hệ thống, nên vẫn đăng nhập được ngay sau đó. Bộ đếm
+mã phiếu về 0, phiếu kế tiếp là `PYC-YYYYMM-0001`.
+
 Mỗi lần đẩy lên nhánh `main`, GitHub Actions dựng lại cả hai image và gắn thẻ
 `latest` cùng `sha-<commit>`. Muốn quay về một bản cũ:
 `IMAGE_TAG=sha-<commit> PREBUILT=true ./deploy.sh`.
