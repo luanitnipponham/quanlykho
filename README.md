@@ -36,8 +36,12 @@ Một lệnh trên máy chủ Linux trắng — tự cài Docker, sinh mật kh�
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/luanitnipponham/quanlykho/main/deploy.sh -o deploy.sh
-sudo bash deploy.sh
+sudo PREBUILT=true bash deploy.sh
 ```
+
+`PREBUILT=true` kéo image dựng sẵn trên GHCR (khoảng 30 giây) thay vì biên dịch
+tại chỗ (5–15 phút và cần ~2 GB RAM cho argon2). Bỏ biến này đi nếu muốn máy chủ
+tự build từ mã nguồn. Hai image đều công khai nên không cần đăng nhập registry.
 
 Hoặc làm thủ công nếu đã có Docker:
 
@@ -60,10 +64,12 @@ Cập nhật lên phiên bản mới về sau — cùng một script, chạy l�
 ```bash
 cd /opt/quanlykho
 git fetch origin main && git reset --hard origin/main
-./deploy.sh
+PREBUILT=true ./deploy.sh
 ```
 
-Muốn máy chủ khỏi phải build, kéo image dựng sẵn trên GHCR: `PREBUILT=true ./deploy.sh`
+Mỗi lần đẩy lên nhánh `main`, GitHub Actions dựng lại cả hai image và gắn thẻ
+`latest` cùng `sha-<commit>`. Muốn quay về một bản cũ:
+`IMAGE_TAG=sha-<commit> PREBUILT=true ./deploy.sh`.
 
 Hướng dẫn triển khai Linux chi tiết: [`docs/deploy.md`](docs/deploy.md).
 

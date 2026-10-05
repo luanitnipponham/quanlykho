@@ -15,6 +15,7 @@
 #
 # Bien moi truong tuy chon:
 #   PREBUILT=true    keo image dung san tren GHCR thay vi build tai cho (nhanh hon nhieu)
+#   IMAGE_TAG=sha-x  quay ve mot ban cu (chi co tac dung khi PREBUILT=true)
 #   HTTP_PORT=8080   cong phia ngoai (mac dinh 80; hoac dat co dinh trong file .env)
 #   REPO_DIR=/srv/x  noi dat ma nguon (mac dinh /opt/quanlykho)
 #   NO_GIT=true      bo qua buoc dong bo ma nguon
@@ -255,6 +256,8 @@ else
 fi
 # ---------------------------------------------------------------------------
 export HTTP_PORT
+# Rong thi docker-compose.prod.yml tu lay "latest".
+export IMAGE_TAG="${IMAGE_TAG:-}"
 # Migration moi (neu co) tu chay trong entrypoint truoc khi API khoi dong.
 if [ "${PREBUILT:-}" = "true" ]; then
   "${COMPOSE[@]}" pull
