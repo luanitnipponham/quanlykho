@@ -29,13 +29,14 @@ export function MasterDataPanel({ kind }: { kind: MasterKind }) {
   const db = useDb();
   const me = useMe();
   const editable = canManageMaster(me, kind);
-  const [editing, setEditing] = useState<{ id?: string; code: string; name: string } | null>(null);
+  const [editing, setEditing] = useState<{ id?: string; code?: string; name: string } | null>(null);
   const items = db[kind].filter((x) => !x.deleted);
   const inUse = (id: string) => db.requests.filter((r) => !isTerminal(r.status) && r[FIELD_OF[kind]] === id).length;
 
   const save = async () => {
     if (!editing) return;
-    const ok = await attempt(() => store.admin({ type: 'SAVE_MASTER', kind, ...editing }));
+    // Mã do hệ thống sinh, không gửi lên; sửa tên cũng không đổi mã.
+    const ok = await attempt(() => store.admin({ type: 'SAVE_MASTER', kind, id: editing.id, name: editing.name }));
     if (ok) setEditing(null);
   };
 
@@ -46,7 +47,7 @@ export function MasterDataPanel({ kind }: { kind: MasterKind }) {
           {items.length} mục · {editable ? 'Xóa là xóa mềm; không xóa được mục đang gắn với phiếu chưa kết thúc.' : 'Bạn chỉ có quyền xem danh mục này.'}
         </p>
         {editable && (
-          <Button size="sm" onClick={() => setEditing({ code: '', name: '' })}>
+          <Button size="sm" onClick={() => setEditing({ name: '' })}>
             <Plus className="h-3.5 w-3.5" /> Thêm
           </Button>
         )}
@@ -94,9 +95,24 @@ export function MasterDataPanel({ kind }: { kind: MasterKind }) {
             </>
           }
         >
-          <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
-            <Input placeholder="Mã" value={editing.code} onChange={(e) => setEditing({ ...editing, code: e.target.value })} aria-label="Mã" />
-            <Input placeholder="Tên" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} aria-label="Tên" />
+          <div className="flex flex-col gap-2">
+            <Input
+              placeholder="Tên"
+              value={editing.name}
+              onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+              aria-label="Tên"
+              autoFocus
+            />
+            <p className="text-xs text-slate-500">
+              {editing.id ? (
+                <>
+                  Mã <span className="font-mono text-slate-700">{editing.code}</span> giữ nguyên — mã đã xuất hiện trên
+                  các phiếu cũ.
+                </>
+              ) : (
+                'Mã do hệ thống tự sinh khi lưu.'
+              )}
+            </p>
           </div>
         </Modal>
       )}

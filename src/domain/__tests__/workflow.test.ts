@@ -559,6 +559,6 @@ describe('Authentication and the four fixed departments', () => {
     w.admin(CU, { type: 'DELETE_MASTER', kind: 'projects', id: 'prj-2' });
     assert.equal(w.db.projects.find((p) => p.id === 'prj-2')!.deleted, true);
     expectCode(() => w.admin(CU, { type: 'SAVE_DEPARTMENT', id: 'dep-cu', code: 'X', name: 'X' }), 'ERR_FORBIDDEN');
-    expectCode(() => w.admin(LD, { type: 'SAVE_MASTER', kind: 'vendors', code: 'N', name: 'NCC mới' }), 'ERR_FORBIDDEN');
+    expectCode(() => w.admin(LD, { type: 'SAVE_MASTER', kind: 'vendors', name: 'NCC mới' }), 'ERR_FORBIDDEN');
   });
 });

@@ -435,7 +435,7 @@ class Store {
         return msg(await api.resetPassword(a.userId, a.passwordHash));
       case 'SAVE_MASTER':
         return msg(
-          a.id ? await api.updateMaster(a.kind, a.id, { code: a.code, name: a.name }) : await api.createMaster(a.kind, { code: a.code, name: a.name }),
+          a.id ? await api.updateMaster(a.kind, a.id, { name: a.name }) : await api.createMaster(a.kind, { name: a.name }),
         );
       case 'DELETE_MASTER':
         return msg(await api.deleteMaster(a.kind, a.id));

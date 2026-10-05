@@ -17,13 +17,37 @@ export type AdminAction =
   | { type: 'DELETE_USER'; userId: string }
   | { type: 'SET_USER_STATUS'; userId: string; status: 'ACTIVE' | 'LOCKED' }
   | { type: 'RESET_PASSWORD'; userId: string; passwordHash: string }
-  | { type: 'SAVE_MASTER'; kind: MasterKind; id?: string; code: string; name: string }
+  | { type: 'SAVE_MASTER'; kind: MasterKind; id?: string; name: string }
   | { type: 'DELETE_MASTER'; kind: MasterKind; id: string }
   | { type: 'SAVE_DEPARTMENT'; id: string; code: string; name: string }
   | { type: 'SAVE_HOLIDAY'; date: string; name: string }
   | { type: 'DELETE_HOLIDAY'; date: string }
   | { type: 'SAVE_CONFIG'; config: SystemConfig }
   | { type: 'MARK_NOTIFICATIONS_READ'; ids: string[] | 'ALL' };
+
+/** Tiền tố mã tự sinh cho từng danh mục; người dùng chỉ nhập tên. */
+const MASTER_PREFIX: Record<MasterKind, string> = {
+  projects: 'DA',
+  categories: 'HM',
+  requesterNames: 'NYC',
+  accountantNames: 'KT',
+  vendors: 'NCC',
+};
+
+/** Mã kế tiếp dạng DA-001. Tính cả mục đã xóa mềm để không dùng lại mã cũ. */
+export function nextMasterCode(db: Db, kind: MasterKind): string {
+  const prefix = MASTER_PREFIX[kind];
+  const used = new Set(db[kind].map((x) => x.code));
+  let max = 0;
+  for (const x of db[kind]) {
+    const m = /^([A-Za-z]+)-(d+)$/.exec(x.code ?? '');
+    if (m && m[1].toUpperCase() === prefix) max = Math.max(max, Number(m[2]));
+  }
+  let next = max + 1;
+  // Dữ liệu cũ có thể mang mã gõ tay trùng dạng; nhảy qua cho tới khi còn trống.
+  while (used.has(`${prefix}-${String(next).padStart(3, '0')}`)) next += 1;
+  return `${prefix}-${String(next).padStart(3, '0')}`;
+}
 
 const MASTER_LABEL: Record<MasterKind, string> = {
   projects: 'Dự án',
@@ -178,7 +202,6 @@ function apply(db: Db, actor: User, action: AdminAction, now: Date): string {
     case 'SAVE_MASTER': {
       if (!canManageMaster(actor, action.kind)) fail('ERR_FORBIDDEN', 'Bạn chỉ được xem danh mục này');
       const name = action.name.trim();
-      const code = action.code.trim();
       if (!name) fail('ERR_REQUIRED_FIELD', 'Nhập tên');
       const list = db[action.kind];
       if (list.some((x) => !x.deleted && x.id !== action.id && x.name.toLowerCase() === name.toLowerCase())) {
@@ -187,10 +210,10 @@ function apply(db: Db, actor: User, action: AdminAction, now: Date): string {
       if (action.id) {
         const item = list.find((x) => x.id === action.id && !x.deleted);
         if (!item) fail('ERR_NOT_FOUND', 'Không tìm thấy mục');
+        // Sửa tên không đổi mã: mã đã xuất hiện trên phiếu và báo cáo cũ.
         item.name = name;
-        item.code = code;
       } else {
-        list.push({ id: nextId(db, action.kind.slice(0, 3)), code, name, deleted: false });
+        list.push({ id: nextId(db, action.kind.slice(0, 3)), code: nextMasterCode(db, action.kind), name, deleted: false });
       }
       audit(db, me, 'MASTER_SAVE', action.kind, action.id ?? null, `${MASTER_LABEL[action.kind]}: ${name}`, now);
       return 'Đã lưu danh mục';

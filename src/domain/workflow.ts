@@ -230,7 +230,15 @@ function stepText(status: Status): string {
 
 function nextRequestCode(db: Db, now: Date): string {
   const ym = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const n = (db.seq[ym] ?? 0) + 1;
+  // Lấy mã lớn nhất đang có của tháng làm sàn: bộ đếm lệch thì mã sẽ trùng, và
+  // hai phiếu khác nhau mang cùng một mã còn tệ hơn lỗi khi tạo.
+  const prefix = `PYC-${ym}-`;
+  let floor = 0;
+  for (const r of db.requests) {
+    if (!r.code.startsWith(prefix)) continue;
+    floor = Math.max(floor, Number(r.code.slice(-4)) || 0);
+  }
+  const n = Math.max(db.seq[ym] ?? 0, floor) + 1;
   db.seq[ym] = n;
   return `PYC-${ym}-${String(n).padStart(4, '0')}`;
 }

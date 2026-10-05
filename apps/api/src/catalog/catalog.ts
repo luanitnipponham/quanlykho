@@ -25,6 +25,15 @@ const MASTER_FK: Record<MasterKind, 'projectId' | 'categoryId' | 'requesterNameI
   accountantNames: 'accountantNameId',
 };
 
+/** Tiền tố mã tự sinh cho từng danh mục; người dùng chỉ nhập tên. */
+const MASTER_PREFIX: Record<MasterKind, string> = {
+  projects: 'DA',
+  categories: 'HM',
+  requesterNames: 'NYC',
+  vendors: 'NCC',
+  accountantNames: 'KT',
+};
+
 export class MasterDto {
   @IsOptional() @IsString() code?: string;
   @IsString() name: string;
@@ -91,11 +100,32 @@ export class CatalogService {
     if (!name) fail('ERR_REQUIRED_FIELD', 'Nhập tên');
     const dup = await this.model(kind).findMany({ where: { deleted: false, name: { equals: name, mode: 'insensitive' }, NOT: id ? { id } : undefined } });
     if (dup.length) fail('ERR_REQUIRED_FIELD', `"${name}" đã có trong danh mục`);
+    // Mã do hệ thống sinh: người dùng chỉ nhập tên. Sửa tên không đổi mã, vì mã đã
+    // xuất hiện trên phiếu và báo cáo cũ.
     const row = id
-      ? await this.model(kind).update({ where: { id }, data: { name, code: dto.code?.trim() ?? '' } })
-      : await this.model(kind).create({ data: { name, code: dto.code?.trim() ?? '' } });
+      ? await this.model(kind).update({ where: { id }, data: { name } })
+      : await this.model(kind).create({ data: { name, code: await this.nextMasterCode(kind) } });
     await this.audit(actor.id, 'MASTER_SAVE', kind, row.id, `${MASTER_LABEL[kind]}: ${name}`);
     return { message: 'Đã lưu danh mục' };
+  }
+
+  /**
+   * Mã kế tiếp theo dạng DA-001. Tính cả mục đã xóa mềm để mã không bị dùng lại —
+   * mã cũ vẫn nằm trên phiếu và báo cáo đã in.
+   */
+  private async nextMasterCode(kind: MasterKind): Promise<string> {
+    const prefix = MASTER_PREFIX[kind];
+    const rows = await this.model(kind).findMany({});
+    const used = new Set(rows.map((r) => r.code));
+    let max = 0;
+    for (const r of rows) {
+      const m = /^([A-Za-z]+)-(d+)$/.exec(r.code ?? '');
+      if (m && m[1].toUpperCase() === prefix) max = Math.max(max, Number(m[2]));
+    }
+    let next = max + 1;
+    // Dữ liệu cũ có thể mang mã gõ tay trùng dạng; nhảy qua cho tới khi còn trống.
+    while (used.has(`${prefix}-${String(next).padStart(3, '0')}`)) next += 1;
+    return `${prefix}-${String(next).padStart(3, '0')}`;
   }
 
   async deleteMaster(actor: Actor, kind: MasterKind, id: string) {

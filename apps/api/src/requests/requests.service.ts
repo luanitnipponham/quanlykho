@@ -200,12 +200,28 @@ export class RequestsService {
   private async nextCode(tx: Tx): Promise<string> {
     const now = new Date();
     const ym = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    // Bộ đếm có thể lệch khỏi thực tế: khôi phục một phần từ bản sao lưu, dọn dữ liệu
+    // bằng tay, hay nhập lại phiếu cũ. Khi đó mã quay về 0001 và trùng mã đã có, khiến
+    // MỌI lần tạo phiếu hỏng với lỗi 500 khó hiểu cho tới khi ai đó sửa bảng đếm.
+    // Lấy mã lớn nhất đang có của tháng làm sàn để bộ đếm tự chỉnh lại.
+    const highest = await tx.paymentRequest.findFirst({
+      where: { code: { startsWith: `PYC-${ym}-` } },
+      orderBy: { code: 'desc' },
+      select: { code: true },
+    });
+    // Mã cố định bề rộng và đệm số 0 nên sắp xếp theo chuỗi trùng với sắp xếp theo số.
+    const floor = highest ? Number(highest.code.slice(-4)) || 0 : 0;
+
     const row = await tx.requestSequence.upsert({
       where: { yearMonth: ym },
-      create: { yearMonth: ym, lastValue: 1 },
+      create: { yearMonth: ym, lastValue: floor + 1 },
       update: { lastValue: { increment: 1 } },
     });
-    return `PYC-${ym}-${String(row.lastValue).padStart(4, '0')}`;
+    if (row.lastValue > floor) return `PYC-${ym}-${String(row.lastValue).padStart(4, '0')}`;
+
+    const fixed = await tx.requestSequence.update({ where: { yearMonth: ym }, data: { lastValue: floor + 1 } });
+    return `PYC-${ym}-${String(fixed.lastValue).padStart(4, '0')}`;
   }
 
   async update(actor: Actor, id: string, dto: UpdateRequestDto) {
