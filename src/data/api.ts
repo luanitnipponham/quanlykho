@@ -144,6 +144,7 @@ export const api = {
   archiveRequest: (id: string, version: number) => post<{ message: string }>(`/payment-requests/${id}/archive`, { version }),
   restoreRequest: (id: string, version: number) => post<{ message: string }>(`/payment-requests/${id}/restore`, { version }),
   comment: (id: string, content: string) => post(`/payment-requests/${id}/comments`, { content }),
+  notifyMissingDocs: (id: string, note?: string) => post<{ message: string }>(`/payment-requests/${id}/notify-missing-docs`, { note }),
 
   attachments: (id: string) => get<unknown[]>(`/payment-requests/${id}/attachments`),
   upload: (id: string, slot: string, files: File[]) => {

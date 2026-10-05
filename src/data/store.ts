@@ -349,6 +349,8 @@ class Store {
         return api.archiveRequest(a.id, a.version);
       case 'RESTORE':
         return api.restoreRequest(a.id, a.version);
+      case 'NOTIFY_MISSING_DOCS':
+        return api.notifyMissingDocs(a.id, a.note);
       case 'COMMENT':
         return (await api.comment(a.id, a.content), { message: 'Đã gửi comment' });
       case 'DETACH':

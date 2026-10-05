@@ -15,7 +15,7 @@ import {
 import { navigate } from '../../app/router';
 import { useDb, useMe } from '../../data/hooks';
 import { store } from '../../data/store';
-import { checkCompletedAttachments } from '../../domain/completedAudit';
+import { DOC_CHECK_STATUSES, checkCompletedAttachments } from '../../domain/completedAudit';
 import { SLOT_DEF, SLOT_GROUPS } from '../../domain/constants';
 import type { PaymentRequest, Status } from '../../domain/types';
 import { cx, formatMoney } from '../../lib/format';
@@ -24,7 +24,10 @@ import { Button, Card, EmptyState, Field, Input, Modal, Notice, PageHeader, Sele
 
 import { attempt } from '../../ui/toast';
 
-type FilterTab = 'ALL' | 'MISSING' | 'COMPLETE' | 'MISSING_PROC' | 'MISSING_ACCT';
+type FilterTab = 'ALL' | 'MISSING' | 'COMPLETE' | 'WAITING_B8' | 'MISSING_PROC' | 'MISSING_ACCT';
+
+/** Phiếu còn ở B8 thì đã chi dứt điểm nhưng chưa khép hồ sơ. */
+const isWaitingInvoice = (pr: PaymentRequest) => pr.status === 'DOCUMENT_SUPPLEMENT_REQUIRED';
 
 export function CompletedRequestsPage() {
   const db = useDb();
@@ -46,9 +49,10 @@ export function CompletedRequestsPage() {
   const [returnReason, setReturnReason] = useState('');
   const [deleteReason, setDeleteReason] = useState('');
 
-  // All completed requests
+  // Phiếu đã kết thúc luồng, cộng thêm phiếu còn ở B8 chờ hóa đơn: B7 cố ý cho đi
+  // tiếp khi thiếu hóa đơn, nên đây là màn duy nhất còn theo dõi khoản thiếu đó.
   const completedList = useMemo(() => {
-    return db.requests.filter((r) => r.status === 'COMPLETED');
+    return db.requests.filter((r) => DOC_CHECK_STATUSES.includes(r.status));
   }, [db.requests]);
 
   // Audited completed requests with their attachment completeness
@@ -61,6 +65,8 @@ export function CompletedRequestsPage() {
 
   // Statistics
   const totalCount = auditedList.length;
+  const doneCount = auditedList.filter((x) => !isWaitingInvoice(x.pr)).length;
+  const waitingB8Count = auditedList.filter((x) => isWaitingInvoice(x.pr)).length;
   const completeCount = auditedList.filter((x) => x.audit.isComplete).length;
   const missingCount = auditedList.filter((x) => !x.audit.isComplete).length;
   const procMissingCount = auditedList.filter((x) => x.audit.hasProcurementMissing).length;
@@ -74,6 +80,8 @@ export function CompletedRequestsPage() {
       list = list.filter((x) => !x.audit.isComplete);
     } else if (activeTab === 'COMPLETE') {
       list = list.filter((x) => x.audit.isComplete);
+    } else if (activeTab === 'WAITING_B8') {
+      list = list.filter((x) => isWaitingInvoice(x.pr));
     } else if (activeTab === 'MISSING_PROC') {
       list = list.filter((x) => x.audit.hasProcurementMissing);
     } else if (activeTab === 'MISSING_ACCT') {
@@ -105,15 +113,21 @@ export function CompletedRequestsPage() {
     <>
       <PageHeader
         title="Phiếu hoàn thành & Kiểm tra chứng từ"
-        description="Tự động kiểm tra tính đầy đủ của toàn bộ chứng từ đính kèm theo quy trình. Phát hiện các phiếu thiếu chứng từ, gửi thông báo đôn đốc bộ phận phụ trách và cho phép Quản trị viên (Admin) thu hồi trả về hoặc xóa phiếu."
+        description="Tự động kiểm tra tính đầy đủ của toàn bộ chứng từ đính kèm theo quy trình, cho cả phiếu đã hoàn thành lẫn phiếu đã chi dứt điểm nhưng còn chờ bổ sung hóa đơn ở B8. Phát hiện phiếu thiếu chứng từ, gửi thông báo đôn đốc bộ phận phụ trách và cho phép Quản trị viên (Admin) thu hồi trả về hoặc xóa phiếu."
       />
 
       {/* KPI Summary Cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Stat
           label="Tổng phiếu hoàn thành"
-          value={totalCount}
+          value={doneCount}
           hint="Hồ sơ đã kết thúc luồng"
+        />
+        <Stat
+          label="Chờ bổ sung hóa đơn B8"
+          value={waitingB8Count}
+          tone={waitingB8Count > 0 ? 'warn' : 'default'}
+          hint={waitingB8Count > 0 ? 'Đã chi xong, NV cung ứng tự nộp hóa đơn' : 'Không còn phiếu chờ'}
         />
         <Stat
           label="Đủ chứng từ hợp lệ"
@@ -148,6 +162,7 @@ export function CompletedRequestsPage() {
                 label: `⚠ Thiếu chứng từ (${missingCount})`,
               },
               { value: 'COMPLETE', label: `✓ Đủ chứng từ (${completeCount})` },
+              { value: 'WAITING_B8', label: `Chờ bổ sung HĐ B8 (${waitingB8Count})` },
               { value: 'MISSING_PROC', label: `Phòng Cung Ứng thiếu (${procMissingCount})` },
               { value: 'MISSING_ACCT', label: `Phòng Kế Toán thiếu (${acctMissingCount})` },
             ]}
@@ -166,7 +181,7 @@ export function CompletedRequestsPage() {
             />
           </div>
           <p className="text-xs text-slate-500">
-            Hiển thị <b>{filteredRows.length}</b> / {totalCount} phiếu hoàn thành
+            Hiển thị <b>{filteredRows.length}</b> / {totalCount} phiếu
           </p>
         </div>
 
@@ -192,6 +207,7 @@ export function CompletedRequestsPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredRows.map(({ pr, audit }) => {
                   const isMissing = !audit.isComplete;
+                  const waiting = isWaitingInvoice(pr);
 
                   return (
                     <tr
@@ -210,6 +226,18 @@ export function CompletedRequestsPage() {
                           >
                             {pr.code}
                           </button>
+                          {waiting ? (
+                            <span
+                              className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"
+                              title="Đã chi dứt điểm ở B7, còn chờ NV cung ứng nộp hóa đơn ở B8"
+                            >
+                              B8 · chờ hóa đơn
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                              Hoàn thành
+                            </span>
+                          )}
                         </div>
                         <p className="truncate font-medium text-slate-900">{pr.title}</p>
                         <p className="truncate text-xs text-slate-500">
@@ -327,8 +355,8 @@ export function CompletedRequestsPage() {
                             <Bell className="h-4 w-4" />
                           </button>
 
-                          {/* Admin: Return to Department */}
-                          {isAdminUser && (
+                          {/* Admin: Return to Department — phiếu B8 đang ở bộ phận cung ứng rồi */}
+                          {isAdminUser && !waiting && (
                             <button
                               onClick={() => {
                                 setReturnPr(pr);
@@ -353,8 +381,8 @@ export function CompletedRequestsPage() {
                             </button>
                           )}
 
-                          {/* Admin: Lưu trữ / Phục hồi tệp đính kèm (A5) */}
-                          {isAdminUser &&
+                          {/* Admin: Lưu trữ / Phục hồi (A5) — chỉ cho phiếu đã khép hồ sơ */}
+                          {isAdminUser && !waiting &&
                             (pr.archivedAt ? (
                               <button
                                 onClick={async () => {
@@ -377,8 +405,8 @@ export function CompletedRequestsPage() {
                               </button>
                             ))}
 
-                          {/* Admin: Delete Request */}
-                          {isAdminUser && (
+                          {/* Admin: Delete Request — phiếu chưa khép hồ sơ thì không xóa ở đây */}
+                          {isAdminUser && !waiting && (
                             <button
                               onClick={() => {
                                 setDeletePr(pr);

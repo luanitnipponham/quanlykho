@@ -4,6 +4,7 @@ import type { Actor, Status } from '../common/domain';
 import { RequestsService, type QueueKey } from './requests.service';
 import {
   CommentDto,
+  NotifyMissingDocsDto,
   CreateRequestDto,
   FinanceApproveDto,
   ForceDto,
@@ -166,5 +167,11 @@ export class RequestsController {
   @Post(':id/comments')
   comment(@CurrentUser() actor: Actor, @Param('id') id: string, @Body() dto: CommentDto) {
     return this.svc.comment(actor, id, dto.content);
+  }
+
+  /** Đôn đốc bộ phận còn thiếu chứng từ — không đổi trạng thái phiếu. */
+  @Post(':id/notify-missing-docs')
+  notifyMissingDocs(@CurrentUser() actor: Actor, @Param('id') id: string, @Body() dto: NotifyMissingDocsDto) {
+    return this.svc.notifyMissingDocs(actor, id, dto.note);
   }
 }

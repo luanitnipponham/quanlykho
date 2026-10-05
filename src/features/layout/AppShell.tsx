@@ -4,7 +4,7 @@ import { COMPLETED_MENU, MENUS, type MenuItem } from '../../app/navigation';
 import { hrefOf, navigate, usePath } from '../../app/router';
 import { useDb, useMe } from '../../data/hooks';
 import { store } from '../../data/store';
-import { countCompletedMissingDocs } from '../../domain/completedAudit';
+import { countMissingDocAlerts } from '../../domain/completedAudit';
 import { ROLE_LABEL } from '../../domain/constants';
 import { queueItems } from '../../domain/permissions';
 import { cx, timeAgo } from '../../lib/format';
@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   // Phiếu đã hoàn thành nhưng hồ sơ còn thiếu chứng từ — mọi phòng ban đều thấy.
-  const missingDocs = useMemo(() => countCompletedMissingDocs(db), [db]);
+  const missingDocs = useMemo(() => countMissingDocAlerts(db), [db]);
 
   const nav = (
     <nav className="flex h-full flex-col" aria-label="Menu chính">
@@ -49,7 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             item={COMPLETED_MENU}
             count={missingDocs}
             tone="warn"
-            countTitle={`${missingDocs} phiếu hoàn thành còn thiếu chứng từ đính kèm`}
+            countTitle={`${missingDocs} phiếu còn thiếu chứng từ đính kèm (gồm cả phiếu chờ bổ sung hóa đơn ở B8)`}
             active={isActive(path, COMPLETED_MENU.path)}
             onClick={() => setOpen(false)}
           />

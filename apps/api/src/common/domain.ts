@@ -332,3 +332,63 @@ export function workingDaysElapsed(start: Date, now: Date, holidays: Set<string>
   }
   return count;
 }
+
+// ---------------------------------------------------------------------------
+// Kiểm tra chứng từ của phiếu đã khép hoặc đang chờ bổ sung (bản sinh đôi của
+// src/domain/completedAudit.ts — hai bên phải sửa cùng nhau)
+// ---------------------------------------------------------------------------
+
+export interface MissingDoc {
+  slot: Slot;
+  label: string;
+  department: 'Phòng Cung Ứng' | 'Phòng Kế Toán';
+  deptKind: 'PROCUREMENT' | 'ACCOUNTING';
+  description: string;
+}
+
+/** Chỉ cần đúng các cột mà bảng kiểm tra đọc tới. */
+export interface AuditableRequest {
+  requestedAmount: number;
+  advanceAmount: number | null;
+  settlementAmount: number | null;
+  hasInvoice: boolean;
+}
+
+/**
+ * Các ô chứng từ bắt buộc còn trống. Thứ tự giữ nguyên như bản frontend để hai
+ * bên hiển thị cùng một danh sách.
+ */
+export function missingDocsOf(pr: AuditableRequest, attachedSlots: Iterable<Slot>): MissingDoc[] {
+  const have = new Set(attachedSlots);
+  const out: MissingDoc[] = [];
+  const need = (slot: Slot, deptKind: 'PROCUREMENT' | 'ACCOUNTING', description: string) => {
+    if (have.has(slot)) return;
+    out.push({
+      slot,
+      label: SLOT_DEF[slot].label,
+      department: deptKind === 'PROCUREMENT' ? 'Phòng Cung Ứng' : 'Phòng Kế Toán',
+      deptKind,
+      description,
+    });
+  };
+
+  need('REQUEST_FORM', 'PROCUREMENT', 'Phiếu yêu cầu mua sắm / thanh toán gốc');
+  need('QUOTATION_COMPARISON', 'PROCUREMENT', 'Báo giá nhà cung cấp kèm bảng so sánh giá');
+
+  const adv = pr.advanceAmount ?? 0;
+  if (adv > 0) {
+    need('PURCHASE_ORDER', 'PROCUREMENT', 'Đơn đặt hàng (PO) đính kèm tạm ứng');
+    need('ADVANCE_REQUEST', 'PROCUREMENT', 'Giấy đề nghị tạm ứng');
+    need('ADVANCE_PROOF', 'ACCOUNTING', 'UNC / Phiếu chi tiền tạm ứng');
+  }
+
+  need('DELIVERY_RECORD', 'PROCUREMENT', 'Biên bản nghiệm thu / giao nhận hàng hóa');
+  need('PAYMENT_REQUEST_DOC', 'PROCUREMENT', 'Giấy đề nghị thanh toán (ĐNTT)');
+  if (pr.hasInvoice) need('INVOICE', 'PROCUREMENT', 'Hóa đơn tài chính (GTGT)');
+
+  // Chỉ đòi chứng từ chi đợt cuối khi B7 thực sự chi tiền.
+  if (remainingOf(pr.requestedAmount, adv, pr.settlementAmount) > 0) {
+    need('FINAL_PROOF', 'ACCOUNTING', 'UNC / Phiếu chi thanh toán đợt cuối');
+  }
+  return out;
+}

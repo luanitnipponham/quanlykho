@@ -180,14 +180,21 @@ export function checkCompletedAttachments(db: Db, pr: PaymentRequest): Completed
 }
 
 /**
- * Số phiếu đã hoàn thành mà hồ sơ còn thiếu chứng từ. Dùng cho badge ở menu
+ * Hai nhóm phiếu mà màn "Phiếu hoàn thành" theo dõi: phiếu đã kết thúc luồng,
+ * và phiếu đã chi dứt điểm ở B7 nhưng còn nằm ở B8 chờ hóa đơn. B7 cố ý không
+ * chặn khi thiếu hóa đơn, nên B8 là nơi duy nhất còn nhìn thấy khoản thiếu đó.
+ */
+export const DOC_CHECK_STATUSES: Status[] = ['COMPLETED', 'DOCUMENT_SUPPLEMENT_REQUIRED'];
+
+/**
+ * Số phiếu còn thiếu chứng từ trong hai nhóm trên. Dùng cho badge ở menu
  * "Phiếu hoàn thành": còn thiếu thì hiện số, đủ hết thì không hiện gì.
  * Phiếu đã lưu trữ vẫn giữ nguyên bản ghi đính kèm nên không bị tính là thiếu.
  */
-export function countCompletedMissingDocs(db: Db): number {
+export function countMissingDocAlerts(db: Db): number {
   let n = 0;
   for (const pr of db.requests) {
-    if (pr.status !== 'COMPLETED') continue;
+    if (!DOC_CHECK_STATUSES.includes(pr.status)) continue;
     if (!checkCompletedAttachments(db, pr).isComplete) n++;
   }
   return n;

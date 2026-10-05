@@ -13,6 +13,7 @@ import {
   assertSettlement,
   authorize,
   fail,
+  missingDocsOf,
   paymentSkipWarning,
   remainingOf,
   requireReason,
@@ -650,6 +651,74 @@ export class RequestsService {
       await this.notify(tx, mentioned.map((u) => u.id), id, `${author.fullName} nhắc đến bạn`, `${pr.code}: ${text.slice(0, 120)}`);
       await this.audit(tx, actor.id, 'COMMENT', 'payment_request', id, `${pr.code}: comment`);
       return { message: 'Đã gửi comment' };
+    });
+  }
+
+  /**
+   * Đôn đốc bộ phận còn thiếu chứng từ, dùng ở màn "Phiếu hoàn thành". Áp dụng
+   * cho cả phiếu đã khép lẫn phiếu còn ở B8 chờ hóa đơn. Không đổi trạng thái
+   * phiếu nên không cần khóa version.
+   */
+  async notifyMissingDocs(actor: Actor, id: string, note?: string) {
+    const pr = await this.prisma.paymentRequest.findUnique({
+      where: { id },
+      include: { attachments: { select: { slot: true } } },
+    });
+    if (!pr) fail('ERR_NOT_FOUND', 'Không tìm thấy phiếu');
+
+    const missing = missingDocsOf(
+      {
+        requestedAmount: Number(pr.requestedAmount),
+        advanceAmount: pr.advanceAmount === null ? null : Number(pr.advanceAmount),
+        settlementAmount: pr.settlementAmount === null ? null : Number(pr.settlementAmount),
+        hasInvoice: pr.hasInvoice,
+      },
+      pr.attachments.map((a) => a.slot as Slot),
+    );
+    if (missing.length === 0) {
+      return { message: 'Phiếu đã có đầy đủ chứng từ, không cần gửi thông báo' };
+    }
+
+    const targets = new Set<string>();
+    const departments: string[] = [];
+    if (missing.some((m) => m.deptKind === 'PROCUREMENT')) {
+      departments.push('Phòng Cung Ứng');
+      if (pr.assignedRequesterId) targets.add(pr.assignedRequesterId);
+    }
+    if (missing.some((m) => m.deptKind === 'ACCOUNTING')) {
+      departments.push('Phòng Kế Toán');
+      if (pr.assignedAccountantId) targets.add(pr.assignedAccountantId);
+      const kt = await this.prisma.user.findMany({ where: { role: 'ACCOUNTANT', status: 'ACTIVE' }, select: { id: true } });
+      for (const u of kt) targets.add(u.id);
+    }
+
+    const trimmed = (note ?? '').trim();
+    const labels = missing.map((m) => `${m.label} (${m.department})`).join(', ');
+    const lines = missing.map((m) => `- ${m.label} [${m.department}]: ${m.description}`).join('\n');
+    const ids = [...targets];
+
+    return this.prisma.$transaction(async (tx) => {
+      await this.notify(
+        tx,
+        ids,
+        pr.id,
+        'Yêu cầu bổ sung chứng từ phiếu hoàn thành',
+        `${pr.code}: Thiếu ${labels}. ${trimmed || 'Vui lòng kiểm tra và bổ sung chứng từ còn thiếu.'}`,
+      );
+      await tx.comment.create({
+        data: {
+          requestId: pr.id,
+          authorId: actor.id,
+          content: `[KIỂM TRA CHỨNG TỪ HOÀN THÀNH]
+Phiếu thiếu các chứng từ sau:
+${lines}
+${trimmed ? `Ghi chú đôn đốc: ${trimmed}
+` : ''}Đề nghị ${departments.join(' và ')} kiểm tra và bổ sung theo quy định.`,
+          mentions: { create: ids.map((userId) => ({ userId })) },
+        },
+      });
+      await this.audit(tx, actor.id, 'NOTIFY_MISSING_DOCS', 'payment_request', pr.id, `${pr.code}: thông báo thiếu chứng từ tới ${departments.join(', ')}`);
+      return { message: `Đã gửi thông báo thiếu chứng từ tới ${departments.join(' và ')}` };
     });
   }
 

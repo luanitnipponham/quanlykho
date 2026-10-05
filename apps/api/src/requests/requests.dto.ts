@@ -93,3 +93,7 @@ export class TransferDto {
 export class CommentDto {
   @IsString() content: string;
 }
+
+export class NotifyMissingDocsDto {
+  @IsOptional() @IsString() note?: string;
+}
