@@ -596,7 +596,16 @@ function FinalPayment({ pr }: { pr: PaymentRequest }) {
   const budget = spendBudget(pr.requestedAmount, pr.advanceAmount ?? 0);
   const over = (pr.settlementAmount ?? 0) > budget;
   const goesToB8 = pr.hasInvoice && !has('INVOICE');
-  const ready = checked && done && !!date && (remaining === 0 || (!!method && has('FINAL_PROOF')));
+  // Còn tiền phải chi thì bắt buộc có chứng từ chi đợt cuối mới được bấm HOÀN THÀNH.
+  // Backend chặn lại bằng ERR_FINAL_NO_PROOF nếu ai đó gọi thẳng API.
+  const needsProof = remaining > 0;
+  const blockers: string[] = [];
+  if (needsProof && !has('FINAL_PROOF')) blockers.push('UNC / Phiếu chi thanh toán đợt cuối');
+  if (needsProof && !method) blockers.push('Hình thức chi');
+  if (!date) blockers.push('Ngày chi');
+  if (!checked) blockers.push('Tick “Đã kiểm tra HS hoàn ứng”');
+  if (!done) blockers.push('Tick “HOÀN THÀNH”');
+  const ready = blockers.length === 0;
 
   return (
     <Panel title="B7 · PKT thanh toán">
@@ -637,6 +646,14 @@ function FinalPayment({ pr }: { pr: PaymentRequest }) {
         </Checkpoint>
       </div>
       <NoReturnHint />
+      {!ready && (
+        <Notice tone="warn" title="Chưa đủ điều kiện để HOÀN THÀNH">
+          Còn thiếu: {blockers.join(' · ')}.
+          {needsProof && !has('FINAL_PROOF')
+            ? ` Phiếu còn phải chi ${formatMoney(remaining)} nên bắt buộc đính kèm chứng từ chi đợt cuối.`
+            : ''}
+        </Notice>
+      )}
       <div>
         <Button
           variant="success"

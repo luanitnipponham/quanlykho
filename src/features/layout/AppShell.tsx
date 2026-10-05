@@ -4,6 +4,7 @@ import { COMPLETED_MENU, MENUS, type MenuItem } from '../../app/navigation';
 import { hrefOf, navigate, usePath } from '../../app/router';
 import { useDb, useMe } from '../../data/hooks';
 import { store } from '../../data/store';
+import { countCompletedMissingDocs } from '../../domain/completedAudit';
 import { ROLE_LABEL } from '../../domain/constants';
 import { queueItems } from '../../domain/permissions';
 import { cx, timeAgo } from '../../lib/format';
@@ -23,6 +24,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     [db, me],
   );
 
+  // Phiếu đã hoàn thành nhưng hồ sơ còn thiếu chứng từ — mọi phòng ban đều thấy.
+  const missingDocs = useMemo(() => countCompletedMissingDocs(db), [db]);
+
   const nav = (
     <nav className="flex h-full flex-col" aria-label="Menu chính">
       <div className="flex items-center gap-2.5 px-5 pb-4 pt-5">
@@ -41,7 +45,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </ul>
         <p className="px-2 pb-1 pt-5 text-[11px] font-medium uppercase tracking-wide text-slate-400">Dùng chung</p>
         <ul className="flex flex-col gap-0.5">
-          <NavLink item={COMPLETED_MENU} active={isActive(path, COMPLETED_MENU.path)} onClick={() => setOpen(false)} />
+          <NavLink
+            item={COMPLETED_MENU}
+            count={missingDocs}
+            tone="warn"
+            countTitle={`${missingDocs} phiếu hoàn thành còn thiếu chứng từ đính kèm`}
+            active={isActive(path, COMPLETED_MENU.path)}
+            onClick={() => setOpen(false)}
+          />
         </ul>
       </div>
       <div className="border-t border-slate-200 p-3">
@@ -122,7 +133,22 @@ function isActive(path: string, itemPath: string): boolean {
   return path === itemPath || (itemPath !== '/home' && path.startsWith(itemPath + '/'));
 }
 
-function NavLink({ item, count, active, onClick }: { item: MenuItem; count?: number; active: boolean; onClick: () => void }) {
+function NavLink({
+  item,
+  count,
+  active,
+  onClick,
+  tone = 'neutral',
+  countTitle,
+}: {
+  item: MenuItem;
+  count?: number;
+  active: boolean;
+  onClick: () => void;
+  /** 'warn' dùng cho số việc còn thiếu, để không lẫn với số phiếu đang chờ xử lý. */
+  tone?: 'neutral' | 'warn';
+  countTitle?: string;
+}) {
   const Icon = item.icon;
   return (
     <li>
@@ -138,7 +164,19 @@ function NavLink({ item, count, active, onClick }: { item: MenuItem; count?: num
         <Icon className="h-4 w-4 shrink-0" />
         <span className="flex-1 truncate">{item.label}</span>
         {count !== undefined && count > 0 && (
-          <span className={cx('rounded-full px-1.5 text-[11px] font-semibold tabular-nums', active ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-700')}>{count}</span>
+          <span
+            title={countTitle}
+            className={cx(
+              'rounded-full px-1.5 text-[11px] font-semibold tabular-nums',
+              tone === 'warn'
+                ? 'bg-red-600 text-white'
+                : active
+                  ? 'bg-brand-600 text-white'
+                  : 'bg-slate-200 text-slate-700',
+            )}
+          >
+            {count > 99 ? '99+' : count}
+          </span>
         )}
       </a>
     </li>

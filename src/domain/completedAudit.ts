@@ -132,10 +132,13 @@ export function checkCompletedAttachments(db: Db, pr: PaymentRequest): Completed
     );
   }
 
-  // 4. Chứng từ chi đợt cuối B7 (Phòng Kế Toán) — chỉ bắt buộc khi còn tiền phải chi
+  // 4. Chứng từ chi đợt cuối B7 (Phòng Kế Toán) — chỉ bắt buộc khi B7 thực sự chi tiền.
+  // Cùng phép tính với remainingOf() trong workflow.ts; không import để tránh vòng lặp
+  // module, vì workflow.ts đã import file này.
   const adv = pr.advanceAmount ?? 0;
-  const settle = pr.settlementAmount ?? pr.requestedAmount;
-  if (settle > adv || !hasAdvance) {
+  const extraSpent = pr.settlementAmount ?? 0;
+  const remaining = Math.max(0, pr.requestedAmount - extraSpent - adv);
+  if (remaining > 0) {
     requireSlot(
       'FINAL_PROOF',
       'Phòng Kế Toán',
@@ -174,4 +177,18 @@ export function checkCompletedAttachments(db: Db, pr: PaymentRequest): Completed
     hasAccountingMissing: accountingMissing.length > 0,
     suggestedReturnStatus,
   };
+}
+
+/**
+ * Số phiếu đã hoàn thành mà hồ sơ còn thiếu chứng từ. Dùng cho badge ở menu
+ * "Phiếu hoàn thành": còn thiếu thì hiện số, đủ hết thì không hiện gì.
+ * Phiếu đã lưu trữ vẫn giữ nguyên bản ghi đính kèm nên không bị tính là thiếu.
+ */
+export function countCompletedMissingDocs(db: Db): number {
+  let n = 0;
+  for (const pr of db.requests) {
+    if (pr.status !== 'COMPLETED') continue;
+    if (!checkCompletedAttachments(db, pr).isComplete) n++;
+  }
+  return n;
 }

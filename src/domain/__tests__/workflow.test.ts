@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { performAdmin, departmentForRole, type AdminAction } from '../admin.ts';
+import { checkCompletedAttachments, countCompletedMissingDocs } from '../completedAudit.ts';
 import { attemptLogin, changePassword } from '../auth.ts';
 import { addWorkingDays, invoiceCountdown, toDateKey, workingDaysElapsed } from '../dates.ts';
 import { DomainError, type ErrorCode } from '../errors.ts';
@@ -145,6 +146,41 @@ describe('Happy path B1 → B8 → COMPLETED', () => {
     const res = w.t(KT, { type: 'PAY_FINAL', checkedDocs: true, completed: true, method: null, paidDate: '2026-09-24' });
     assert.equal(res.status, 'COMPLETED');
     assert.equal(w.pr.transactions.length, 1);
+    // Còn lại phải chi = 0 nên B7 không chi đồng nào: không được đòi UNC đợt cuối,
+    // và phiếu phải được coi là đủ chứng từ (không hiện badge).
+    const audit = checkCompletedAttachments(w.db, w.pr);
+    assert.deepEqual(audit.missingDocuments.map((m) => m.slot), []);
+    assert.ok(audit.isComplete);
+    assert.equal(countCompletedMissingDocs(w.db), 0);
+  });
+
+  it('badge "Phiếu hoàn thành" chỉ đếm phiếu hoàn thành còn thiếu chứng từ', () => {
+    const w = new World();
+    w.toB7();
+    w.attach(KT, 'FINAL_PROOF');
+    w.t(KT, { type: 'PAY_FINAL', checkedDocs: true, completed: true, method: 'TRANSFER', paidDate: '2026-09-24' });
+    w.attach(CU, 'INVOICE');
+    w.t(CU, { type: 'COMPLETE_INVOICE' });
+    const done = w.db.requests.find((r) => r.id === w.id)!;
+    assert.equal(done.status, 'COMPLETED');
+    assert.ok(checkCompletedAttachments(w.db, done).isComplete, 'phiếu đi đủ luồng thì không thiếu chứng từ');
+
+    // World bắt đầu từ emptyDb nên đếm được chính xác, không phụ thuộc dữ liệu mẫu.
+    assert.equal(countCompletedMissingDocs(w.db), 0, 'đủ chứng từ thì không hiện badge');
+
+    // Gỡ một chứng từ bắt buộc thì badge lên 1.
+    w.db.attachments = w.db.attachments.filter((x) => !(x.requestId === done.id && x.slot === 'DELIVERY_RECORD'));
+    assert.equal(countCompletedMissingDocs(w.db), 1);
+
+    // Gỡ thêm chứng từ thứ hai trên cùng phiếu: badge đếm phiếu, không đếm file.
+    w.db.attachments = w.db.attachments.filter((x) => !(x.requestId === done.id && x.slot === 'INVOICE'));
+    assert.equal(countCompletedMissingDocs(w.db), 1);
+
+    // Phiếu chưa hoàn thành, dù thiếu chứng từ, không được tính.
+    const pending = new World();
+    pending.toB6();
+    assert.equal(pending.db.requests.find((r) => r.id === pending.id)!.status, 'AFTER_ADVANCE');
+    assert.equal(countCompletedMissingDocs(pending.db), 0);
   });
 
   it('never persists AUTO_VERIFY and covers every status in the seed', () => {
