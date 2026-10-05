@@ -58,23 +58,25 @@ export const QUEUE_PAGES: Record<string, QueueConfig> = {
   },
   '/accounting/advance-payments': {
     title: 'PKT tạm ứng — B5',
-    description: 'Phiếu được giao cho bạn, sắp theo độ ưu tiên. Thiếu sót: comment @ người phụ trách (kế toán không có nút trả lại).',
+    description:
+      'Phiếu đã giao cho Phòng Kế toán, sắp theo độ ưu tiên. Cột NV kế toán cho biết TPTC giao phiếu cho ai — gõ tên vào ô tìm kiếm để lọc phần của mình. Thiếu sót: comment @ người phụ trách (kế toán không có nút trả lại).',
     queue: 'advancePayments',
-    columns: ['requester', 'priority', 'amounts'],
+    columns: ['requester', 'accountant', 'priority', 'amounts'],
     empty: 'Không có phiếu chờ chi tạm ứng',
   },
   '/accounting/final-payments': {
     title: 'PKT thanh toán — B7',
-    description: 'Thanh toán dứt điểm phần còn lại, kể cả khi chưa có hóa đơn.',
+    description:
+      'Thanh toán dứt điểm phần còn lại, kể cả khi chưa có hóa đơn. Gõ tên vào ô tìm kiếm để lọc phiếu của mình.',
     queue: 'finalPayments',
-    columns: ['requester', 'priority', 'amounts'],
+    columns: ['requester', 'accountant', 'priority', 'amounts'],
     empty: 'Không có phiếu chờ thanh toán',
   },
   '/accounting/missing-invoices': {
     title: 'Theo dõi thiếu hóa đơn',
-    description: 'Phiếu bạn phụ trách đang ở B8. Nhắc NV cung ứng bằng comment @.',
+    description: 'Phiếu của Phòng Kế toán đang ở B8. Nhắc NV cung ứng bằng comment @.',
     queue: 'missingInvoices',
-    columns: ['requester'],
+    columns: ['requester', 'accountant'],
     empty: 'Không có phiếu thiếu hóa đơn',
   },
 };
