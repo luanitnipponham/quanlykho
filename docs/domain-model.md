@@ -31,7 +31,7 @@
 | `hasInvoice` | Checkbox "Có hóa đơn" — quyết định nhánh AUTO_VERIFY |
 | `requestedAmount` | Tổng đề nghị (> 0) |
 | `advanceAmount` | Tạm ứng (B3): 0 < x ≤ `requestedAmount` |
-| `settlementAmount` | Quyết toán (B6): ≥ `advanceAmount` |
+| `settlementAmount` | Đã chi thêm (B6): 0 ≤ giá trị ≤ `requestedAmount` − `advanceAmount`. Giữ tên cột cũ `settlement_amount` |
 | `priority` | `HIGH`, `MEDIUM`, `LOW` — chọn ở B4, dùng xếp hàng đợi B5/B7 |
 | `invoiceDueStartAt`, `lateInvoice`, `lastLateReminderOn` | Đếm và gắn cờ hạn B8 |
 | `resubmitted` | Bị Lãnh đạo trả lại (T5) hoặc Admin mở lại (A3) |

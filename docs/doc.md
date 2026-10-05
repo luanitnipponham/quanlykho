@@ -109,7 +109,7 @@ Bốn phòng ban cố định, Admin chỉ đổi được tên/mã, không thê
 | T6 | B3 | ☑ Hoàn tất HS tạm ứng | NV CU | 0 < Tạm ứng ≤ Tổng đề nghị; file Đơn đặt hàng, Đề nghị tạm ứng | B4 |
 | T7 | B4 | ☑ TPTC duyệt và chuyển Kế toán | TPTC | Độ ưu tiên; còn ≥ 1 Kế toán hoạt động (hệ thống tự gán) | B5 |
 | T8 | B5 | ☑ Đã KT HS + ☑ Đã thanh toán tạm ứng | Kế toán được giao | UNC/Phiếu chi; ngày chi | B6 |
-| T9 | B6 | ☑ Hoàn tất HS ĐN thanh toán | NV CU | Quyết toán ≥ Tạm ứng; file BNH, ĐNTT | B7 |
+| T9 | B6 | ☑ Hoàn tất HS ĐN thanh toán | NV CU | 0 ≤ Đã chi thêm ≤ Tổng đề nghị − Đã tạm ứng; file BNH, ĐNTT | B7 |
 | T10 | B7 | ☑ Đã KT HS hoàn ứng + ☑ HOÀN THÀNH | Kế toán | UNC đợt cuối nếu Còn lại > 0; ngày chi | AUTO_VERIFY |
 | T11 | AUTO_VERIFY | AUTO_PASS | Hệ thống | Không HĐ **hoặc** đã có hóa đơn | COMPLETED |
 | T12 | AUTO_VERIFY | AUTO_REQUIRE_INVOICE | Hệ thống | Có HĐ **và** ô hóa đơn trống | B8 |
@@ -138,7 +138,7 @@ Ngoài ra Admin sửa dữ liệu, thay file, tick thay và xóa phiếu ở **m
 | `ERR_AMOUNT_NOT_POSITIVE` | Chặn | Tổng đề nghị ≤ 0 |
 | `ERR_DOC_INCOMPLETE` | Chặn | Thiếu file ở ô bắt buộc của bước |
 | `ERR_ADV_ZERO` / `ERR_ADV_EXCEED_TOTAL` | Chặn | Tạm ứng ≤ 0 hoặc > Tổng đề nghị |
-| `ERR_SETTLE_BELOW_ADV` | Chặn | Quyết toán < Tạm ứng. Giao diện báo lỗi **ngay tại ô nhập** và khóa nút gửi |
+| `ERR_SETTLE_OVER_BUDGET` | Chặn | Đã chi thêm > Tổng đề nghị − Đã tạm ứng. Giao diện báo lỗi **ngay tại ô nhập** và khóa nút gửi |
 | `ERR_PAYMENT_NO_CONFIRM` | Chặn | Chưa tick đủ ô ☑ |
 | `ERR_FINAL_NO_PROOF` | Chặn | Còn lại > 0 mà thiếu UNC đợt cuối ở B7 |
 | `ERR_SELF_APPROVAL` | Chặn | Duyệt B2 phiếu do chính mình tạo |
@@ -308,4 +308,4 @@ Chạy lúc 00:00 hằng ngày và một lần khi backend khởi động:
 - Nhiều lần tạm ứng cho một phiếu (hiện 1 lần ở B5).
 - Tích hợp ERP/MISA và xác thực hóa đơn điện tử (hiện chỉ kiểm tra có file).
 - Thời hạn lưu trữ chứng từ pháp lý và cơ chế archive.
-- Quy trình xử lý khi quyết toán thực tế nhỏ hơn tạm ứng (hiện chặn tại ô nhập ở B6).
+- Quy trình thu hồi khi chi thực tế nhỏ hơn khoản đã tạm ứng (hiện chỉ tính Còn lại phải chi, không có luồng hoàn tiền về công ty).

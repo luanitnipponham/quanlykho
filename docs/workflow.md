@@ -116,7 +116,7 @@ Ghi chú: A1 (Force), A2 (Admin hủy), A4 (Chuyển giao NV CU) là thao tác �
 | T6 | B3 ADVANCE_PREPARATION | ☑ Hoàn tất HS tạm ứng | NV cung ứng, Admin | 0 < Tạm ứng ≤ Tổng đề nghị; file Đơn đặt hàng, Đề nghị tạm ứng | B4 | TPTC |
 | T7 | B4 COORDINATION | ☑ TPTC duyệt và chuyển Kế toán | TPTC, Admin | Tài khoản Kế toán đang hoạt động; Độ ưu tiên | B5 | Kế toán |
 | T8 | B5 ADVANCE_PAYMENT | ☑ Đã KT HS + ☑ Đã thanh toán tạm ứng | Kế toán được giao, Admin | Chứng từ chi (UNC / Phiếu chi); ngày chi | B6 | NV cung ứng |
-| T9 | B6 AFTER_ADVANCE | ☑ Hoàn tất HS ĐN thanh toán | NV cung ứng, Admin | Giá trị quyết toán ≥ Tạm ứng (nhỏ hơn: báo lỗi ngay tại ô nhập, không cho nhập); file BNH, ĐNTT, Hóa đơn (nếu có) | B7 | Kế toán phụ trách |
+| T9 | B6 AFTER_ADVANCE | ☑ Hoàn tất HS ĐN thanh toán | NV cung ứng, Admin | 0 ≤ Đã chi thêm ≤ Tổng đề nghị − Đã tạm ứng (vượt trần: báo lỗi ngay tại ô nhập, không cho gửi); file BNH, ĐNTT, Hóa đơn (nếu có) | B7 | Kế toán phụ trách |
 | T10 | B7 FINAL_PAYMENT | ☑ Đã KT HS hoàn ứng + ☑ HOÀN THÀNH | Kế toán phụ trách, Admin | UNC đợt cuối nếu còn lại > 0; ngày chi | AUTO_VERIFY | — |
 | T11 | AUTO_VERIFY | AUTO_PASS | Hệ thống | Loại chi = Không HĐ HOẶC đã có file hóa đơn | COMPLETED | NV cung ứng |
 | T12 | AUTO_VERIFY | AUTO_REQUIRE_INVOICE | Hệ thống | Loại chi = Có HĐ VÀ ô hóa đơn trống | B8 | NV cung ứng (đếm 5 ngày làm việc) |
@@ -165,7 +165,7 @@ Hệ thống chỉ có **một luồng duyệt duy nhất**: TPTC tick duyệt �
 ## 6. Ràng buộc nghiệp vụ
 
 1. Mã phiếu tự sinh, duy nhất, không sửa (ví dụ `PYC-YYYYMM-0001`).
-2. Số tiền: Tổng đề nghị > 0; 0 < Tạm ứng ≤ Tổng đề nghị; Số tiền còn lại = Quyết toán − Tạm ứng (hệ thống tự tính). Quyết toán < Tạm ứng: **báo lỗi ngay tại ô nhập ở B6, không cho nhập giá trị** (không chuyển Admin). Quyết toán > Tổng đề nghị: cảnh báo cho kế toán ở B7.
+2. Số tiền: Tổng đề nghị > 0; 0 < Tạm ứng ≤ Tổng đề nghị. Ở B6 nhân viên cung ứng nhập **Đã chi thêm** (phần chi ngoài khoản đã tạm ứng), hệ thống tự tính **Còn lại phải chi = Tổng đề nghị − Đã chi thêm − Đã tạm ứng**. Trần của ô nhập là Tổng đề nghị − Đã tạm ứng; vượt trần thì **báo lỗi ngay tại ô nhập ở B6, không cho gửi** (không chuyển Admin), backend trả `ERR_SETTLE_OVER_BUDGET`. Nhập 0 là hợp lệ, nghĩa là không chi thêm đồng nào ngoài khoản tạm ứng. Trong database giá trị này vẫn nằm ở cột `settlement_amount` (giữ tên cũ để không phải đổi hợp đồng API).
 3. Khóa hồ sơ theo bước: file và field chỉ sửa được khi phiếu đang ở đúng bước và chưa tick chốt; mở lại khi bị trả lại hoặc do Admin. Riêng file hóa đơn được bổ sung ở B6, B7, B8.
 4. Trách nhiệm theo phòng ban: mỗi phòng ban chỉ có 1 người, phiếu do người của phòng ban đó tạo và chịu trách nhiệm trên form vận hành của phòng mình. Không áp dụng ràng buộc Tách biệt nhiệm vụ (SoD): hệ thống không chặn trường hợp người duyệt hoặc kế toán được giao trùng người tạo phiếu.
 5. Hủy phiếu: **chỉ có ở B1** (NV cung ứng, không cần nhập lý do; hủy rồi thì tạo phiếu mới). Từ B2 trở đi, sau khi Lãnh đạo đã duyệt, không phòng ban nào được hủy hay cancel phiếu — phiếu đi đủ luồng B1 → B8. Chỉ Lãnh đạo có quyền Từ chối (bắt buộc ghi lý do), Trả lại và Phê duyệt. Đặc quyền A2 của Admin không nằm trong ràng buộc này.

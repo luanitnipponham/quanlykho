@@ -36,8 +36,8 @@ Bộ test nghiệp vụ chạy trên `src/domain` — bản đặc tả có th�
 | T7 | Thiếu tick / thiếu ưu tiên / sai vai trò | `ERR_PAYMENT_NO_CONFIRM` / `ERR_REQUIRED_FIELD` / `ERR_FORBIDDEN` | ✅ | — |
 | T7 | Không còn Kế toán hoạt động | `ERR_NO_ACCOUNTANT`, giữ B4, báo Admin | ✅ | — |
 | T8 | Thiếu tick / thiếu UNC / kế toán khác | `ERR_PAYMENT_NO_CONFIRM` / `ERR_DOC_INCOMPLETE` / `ERR_FORBIDDEN` | ✅ | ✅ |
-| T9 | Quyết toán < tạm ứng | `ERR_SETTLE_BELOW_ADV`; giao diện báo lỗi **ngay tại ô nhập** và khóa nút gửi | ✅ | ✅ |
-| T9 | Quyết toán ≥ tạm ứng | → FINAL_PAYMENT, tính đúng Còn lại phải chi | ✅ | ✅ |
+| T9 | Đã chi thêm vượt trần (Tổng đề nghị − Tạm ứng) | `ERR_SETTLE_OVER_BUDGET`; giao diện báo lỗi **ngay tại ô nhập** và khóa nút gửi | ✅ | ✅ |
+| T9 | Đã chi thêm trong trần (kể cả 0) | → FINAL_PAYMENT, Còn lại phải chi = Tổng đề nghị − Đã chi thêm − Đã tạm ứng | ✅ | ✅ |
 | T10 | Còn lại > 0 mà thiếu UNC đợt cuối | `ERR_FINAL_NO_PROOF` | ✅ | — |
 | T10→T11 | Không HĐ, hoặc đã có hóa đơn từ B6 | COMPLETED trong cùng thao tác | ✅ | — |
 | T10→T12 | Có HĐ, ô hóa đơn trống | → B8, bắt đầu đếm ngày làm việc | ✅ | ✅ |

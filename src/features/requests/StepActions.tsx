@@ -540,7 +540,7 @@ function Settlement({ pr }: { pr: PaymentRequest }) {
       </div>
       <Checklist
         items={[
-          { ok: amount > 0 && !amountError, label: 'Quyết toán ≥ Tạm ứng' },
+          { ok: !amountError, label: 'Đã chi thêm trong trần cho phép' },
           { ok: has('DELIVERY_RECORD'), label: 'BNH' },
           { ok: has('PAYMENT_REQUEST_DOC'), label: 'ĐNTT' },
           { ok: !pr.hasInvoice || has('INVOICE'), label: pr.hasInvoice ? 'Hóa đơn (có thể bổ sung sau ở B7, B8)' : 'Loại chi Không hóa đơn' },
@@ -551,7 +551,7 @@ function Settlement({ pr }: { pr: PaymentRequest }) {
       </Checkpoint>
       <div>
         <Button
-          disabled={!tick || amount <= 0 || !!amountError}
+          disabled={!tick || !!amountError}
           onClick={() => run({ type: 'SUBMIT_SETTLEMENT', id: pr.id, version: pr.version, confirmed: tick, settlementAmount: amount })}
         >
           Gửi kế toán thanh toán → B7
@@ -593,7 +593,8 @@ function FinalPayment({ pr }: { pr: PaymentRequest }) {
   const [method, setMethod] = useState<PaymentMethod | ''>('');
   const [date, setDate] = useState(toDateKey(new Date()));
   const remaining = remainingOf(pr);
-  const over = (pr.settlementAmount ?? 0) > pr.requestedAmount;
+  const budget = spendBudget(pr.requestedAmount, pr.advanceAmount ?? 0);
+  const over = (pr.settlementAmount ?? 0) > budget;
   const goesToB8 = pr.hasInvoice && !has('INVOICE');
   const ready = checked && done && !!date && (remaining === 0 || (!!method && has('FINAL_PROOF')));
 
@@ -602,8 +603,9 @@ function FinalPayment({ pr }: { pr: PaymentRequest }) {
       <AssignedAccountant pr={pr} />
       <AmountsTable pr={pr} />
       {over && (
-        <Notice tone="warn" title="Quyết toán vượt Tổng đề nghị">
-          Vượt {formatMoney((pr.settlementAmount ?? 0) - pr.requestedAmount)}. Kiểm tra kỹ trước khi chi.
+        <Notice tone="warn" title="Đã chi thêm vượt trần">
+          Vượt {formatMoney((pr.settlementAmount ?? 0) - budget)} so với Tổng đề nghị − Đã tạm ứng. Kiểm tra kỹ trước
+          khi chi.
         </Notice>
       )}
       {remaining > 0 ? (

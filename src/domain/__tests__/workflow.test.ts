@@ -305,6 +305,18 @@ describe('B6 and B7 amounts', () => {
     assert.equal(remainingOf(w.pr), 45_000_000);
   });
 
+  it('Đã chi thêm bằng 0 vẫn gửi được: không chi gì ngoài khoản tạm ứng', () => {
+    const w = new World();
+    w.toB6();
+    w.attach(CU, 'DELIVERY_RECORD');
+    w.attach(CU, 'PAYMENT_REQUEST_DOC');
+    w.t(CU, { type: 'SUBMIT_SETTLEMENT', confirmed: true, settlementAmount: 0 });
+    assert.equal(w.pr.status, 'FINAL_PAYMENT');
+    assert.equal(w.pr.settlementAmount, 0);
+    // Chưa chi thêm đồng nào thì kế toán ở B7 phải chi hết phần chưa tạm ứng.
+    assert.equal(remainingOf(w.pr), 60_000_000);
+  });
+
   it('remaining > 0 requires the final UNC at B7', () => {
     const w = new World();
     w.toB7(20_000_000);

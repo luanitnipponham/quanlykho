@@ -44,7 +44,7 @@ export const QUEUE_PAGES: Record<string, QueueConfig> = {
   },
   '/procurement/after-advance': {
     title: 'Theo dõi sau tạm ứng — B6',
-    description: 'Đã nhận tạm ứng. Nhập giá trị quyết toán, đính kèm BNH, ĐNTT (và hóa đơn nếu có) để gửi kế toán thanh toán.',
+    description: 'Đã nhận tạm ứng. Nhập số đã chi thêm, đính kèm BNH, ĐNTT (và hóa đơn nếu có) để gửi kế toán thanh toán.',
     queue: 'afterAdvance',
     columns: ['accountant', 'amounts'],
     empty: 'Không có phiếu đang theo dõi sau tạm ứng',
