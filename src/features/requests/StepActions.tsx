@@ -1,20 +1,33 @@
 // The checkpoint panel for the request's current step (workflow §5.1).
 // A button only appears when domain/permissions allows that action for the signed-in role.
 import { useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, CircleDashed, Clock3, MessageSquareWarning } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Clock3, MessageSquareWarning, Settings2 } from 'lucide-react';
 import { useDb, useMe, useNow } from '../../data/hooks';
 import { store } from '../../data/store';
 import { METHOD_LABEL, PRIORITY_LABEL, SLOT_DEF, STATUS_LABEL, STATUS_STEP } from '../../domain/constants';
 import { invoiceCountdown, toDateKey } from '../../domain/dates';
-import { can, leaders as allLeaders, theAccountant, type RequestActionKey } from '../../domain/permissions';
+import { can, canManageMaster, leaders as allLeaders, theAccountant, type RequestActionKey } from '../../domain/permissions';
 import type { PaymentMethod, PaymentRequest, Priority, Slot } from '../../domain/types';
 import { remainingOf, settlementError } from '../../domain/workflow';
 import { cx, formatDate, formatMoney } from '../../lib/format';
-import { userName } from '../../lib/lookup';
-import { Button, Card, Checkpoint, Field, Input, MoneyInput, Notice, Select, Textarea } from '../../ui/primitives';
+import { masterName, userName } from '../../lib/lookup';
+import { Button, Card, Checkpoint, Field, Input, Modal, MoneyInput, Notice, Select, Textarea } from '../../ui/primitives';
 import { attempt } from '../../ui/toast';
+import { MasterDataPanel } from '../master-data/MasterDataPanel';
 import { AttachmentSlot } from './Attachments';
 import { ReasonDialog, type ReasonRequest } from './ReasonDialog';
+
+/** Tên nhân viên Kế toán do TPTC chỉ định ở B4, hiện trên mọi form bên Kế toán. */
+function AssignedAccountant({ pr }: { pr: PaymentRequest }) {
+  const db = useDb();
+  if (!pr.accountantNameId) return null;
+  return (
+    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+      Kế toán phụ trách: <span className="font-medium text-slate-900">{masterName(db, 'accountantNames', pr.accountantNameId)}</span>
+      <span className="text-slate-500"> — do Trưởng phòng Tài chính chỉ định ở B4</span>
+    </p>
+  );
+}
 
 function Panel({ title, children, tone = 'brand' }: { title: ReactNode; children: ReactNode; tone?: 'brand' | 'amber' }) {
   return (
@@ -318,23 +331,51 @@ function AdvancePrep({ pr }: { pr: PaymentRequest }) {
 
 function FinanceApprove({ pr }: { pr: PaymentRequest }) {
   const db = useDb();
+  const me = useMe();
   const accountant = theAccountant(db);
   const [priority, setPriority] = useState<Priority | ''>('');
+  const [accountantNameId, setAccountantNameId] = useState(pr.accountantNameId ?? '');
   const [note, setNote] = useState('');
   const [tick, setTick] = useState(false);
+  const [manage, setManage] = useState(false);
+  const staff = db.accountantNames.filter((x) => !x.deleted || x.id === accountantNameId);
 
   return (
     <Panel title="B4 · TPTC duyệt và chuyển Kế toán">
-      {accountant ? (
-        <Notice tone="info" title="Kế toán tiếp nhận">
-          {accountant.fullName} (<span className="font-mono">{accountant.username}</span>) — hệ thống tự điền, không phải chọn người.
-        </Notice>
-      ) : (
+      {!accountant && (
         <Notice tone="danger" title="Chưa có tài khoản Kế toán đang hoạt động">
           Duyệt sẽ bị chặn và Admin được báo.
         </Notice>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label={
+            <span className="flex items-center justify-between gap-2">
+              Nhân viên Kế toán tiếp nhận
+              {canManageMaster(me, 'accountantNames') && (
+                <button
+                  type="button"
+                  onClick={() => setManage(true)}
+                  className="inline-flex items-center gap-1 text-[11px] font-normal text-brand-700 hover:underline"
+                >
+                  <Settings2 className="h-3 w-3" /> Quản lý
+                </button>
+              )}
+            </span>
+          }
+          required
+          htmlFor="acct-name"
+          hint={accountant ? `Tên hiện trên phiếu cho cả hai bên; phiếu vẫn vào tài khoản ${accountant.username}` : undefined}
+        >
+          <Select id="acct-name" value={accountantNameId} onChange={(e) => setAccountantNameId(e.target.value)}>
+            <option value="">— Chọn —</option>
+            {staff.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <Field label="Độ ưu tiên" required htmlFor="prio" hint="Dùng để sắp xếp hàng đợi B5, B7">
           <Select id="prio" value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
             <option value="">— Chọn —</option>
@@ -354,12 +395,27 @@ function FinanceApprove({ pr }: { pr: PaymentRequest }) {
       </Checkpoint>
       <div>
         <Button
-          disabled={!tick || !priority || !accountant}
-          onClick={() => run({ type: 'FINANCE_APPROVE', id: pr.id, version: pr.version, confirmed: tick, priority: priority || null, note })}
+          disabled={!tick || !priority || !accountantNameId || !accountant}
+          onClick={() =>
+            run({
+              type: 'FINANCE_APPROVE',
+              id: pr.id,
+              version: pr.version,
+              confirmed: tick,
+              priority: priority || null,
+              accountantNameId,
+              note,
+            })
+          }
         >
           Duyệt và chuyển Kế toán → B5
         </Button>
       </div>
+      {manage && (
+        <Modal title="Danh mục Nhân viên kế toán" onClose={() => setManage(false)} wide>
+          <MasterDataPanel kind="accountantNames" />
+        </Modal>
+      )}
     </Panel>
   );
 }
@@ -406,6 +462,7 @@ function PayAdvance({ pr }: { pr: PaymentRequest }) {
   const [date, setDate] = useState(toDateKey(new Date()));
   return (
     <Panel title="B5 · PKT tạm ứng">
+      <AssignedAccountant pr={pr} />
       <div className="rounded-lg bg-slate-50 px-4 py-3">
         <p className="text-xs text-slate-500">Số tiền tạm ứng (từ B3, chỉ đọc)</p>
         <p className="text-xl font-semibold tabular-nums text-slate-900">{formatMoney(pr.advanceAmount)}</p>
@@ -532,6 +589,7 @@ function FinalPayment({ pr }: { pr: PaymentRequest }) {
 
   return (
     <Panel title="B7 · PKT thanh toán">
+      <AssignedAccountant pr={pr} />
       <AmountsTable pr={pr} />
       {over && (
         <Notice tone="warn" title="Quyết toán vượt Tổng đề nghị">

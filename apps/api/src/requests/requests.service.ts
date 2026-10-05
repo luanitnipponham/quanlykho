@@ -41,6 +41,7 @@ const DETAIL_INCLUDE = {
   category: true,
   requesterName: true,
   vendor: true,
+  accountantName: true,
   createdBy: { select: { id: true, fullName: true, username: true, role: true } },
   assignedRequester: { select: { id: true, fullName: true, username: true } },
   assignedAccountant: { select: { id: true, fullName: true, username: true } },
@@ -325,9 +326,13 @@ export class RequestsService {
     return this.tx(actor, id, dto.version, 'FINANCE_APPROVE', async (tx, pr) => {
       requireTick(dto.confirmed, 'TPTC duyệt và chuyển Kế toán');
       if (!dto.priority) fail('ERR_REQUIRED_FIELD', 'Chọn Độ ưu tiên');
+      if (!dto.accountantNameId) fail('ERR_REQUIRED_FIELD', 'Chọn Nhân viên kế toán tiếp nhận');
+      const who = await tx.accountantName.findFirst({ where: { id: dto.accountantNameId, deleted: false } });
+      if (!who) fail('ERR_NOT_FOUND', 'Nhân viên kế toán không hợp lệ hoặc đã bị xóa');
       const note = dto.note?.trim();
       await this.move(tx, pr, 'T7', 'ADVANCE_PAYMENT', actor.id, note || null, {
         assignedAccountant: { connect: { id: accountant.id } },
+        accountantName: { connect: { id: dto.accountantNameId } },
         priority: dto.priority,
       });
       if (note) {

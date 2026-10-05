@@ -195,6 +195,8 @@ export function canDeleteAttachment(user: User, pr: PaymentRequest, att: Attachm
 export function canManageMaster(user: User, kind: MasterKind | 'departments'): boolean {
   if (user.status !== 'ACTIVE') return false;
   if (kind === 'departments') return isAdmin(user);
+  // Danh sách nhân viên Kế toán do TPTC giữ, vì chính TPTC chỉ định người nhận phiếu ở B4.
+  if (kind === 'accountantNames') return isAdmin(user) || user.role === 'FINANCE_MANAGER';
   return isAdmin(user) || user.role === 'REQUESTER';
 }
 

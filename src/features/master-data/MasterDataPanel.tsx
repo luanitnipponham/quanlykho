@@ -13,13 +13,15 @@ export const MASTER_TITLE: Record<MasterKind | 'departments', string> = {
   departments: 'Phòng ban',
   categories: 'Hạng mục chi',
   requesterNames: 'Người yêu cầu',
+  accountantNames: 'Nhân viên kế toán',
   vendors: 'Nhà cung cấp',
 };
 
-const FIELD_OF: Record<MasterKind, 'projectId' | 'categoryId' | 'requesterNameId' | 'vendorId'> = {
+const FIELD_OF: Record<MasterKind, 'projectId' | 'categoryId' | 'requesterNameId' | 'vendorId' | 'accountantNameId'> = {
   projects: 'projectId',
   categories: 'categoryId',
   requesterNames: 'requesterNameId',
+  accountantNames: 'accountantNameId',
   vendors: 'vendorId',
 };
 

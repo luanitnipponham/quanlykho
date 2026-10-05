@@ -320,7 +320,13 @@ class Store {
       case 'SUBMIT_ADVANCE':
         return api.action(a.id, 'submit-advance', { version: a.version, confirmed: a.confirmed, advanceAmount: a.advanceAmount });
       case 'FINANCE_APPROVE':
-        return api.action(a.id, 'finance-approve', { version: a.version, confirmed: a.confirmed, priority: a.priority, note: a.note });
+        return api.action(a.id, 'finance-approve', {
+          version: a.version,
+          confirmed: a.confirmed,
+          priority: a.priority,
+          accountantNameId: a.accountantNameId,
+          note: a.note,
+        });
       case 'PAY_ADVANCE':
         return api.action(a.id, 'pay-advance', { version: a.version, checkedDocs: a.checkedDocs, paid: a.paid, method: a.method, paidDate: a.paidDate });
       case 'SUBMIT_SETTLEMENT':
@@ -470,6 +476,7 @@ function emptyShell(): Db {
     projects: [],
     categories: [],
     requesterNames: [],
+    accountantNames: [],
     vendors: [],
     requests: [],
     attachments: [],

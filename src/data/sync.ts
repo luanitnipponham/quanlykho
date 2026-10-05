@@ -53,6 +53,7 @@ function mapRequest(r: Row): PaymentRequest {
     projectId: r.projectId as string,
     categoryId: r.categoryId as string,
     requesterNameId: r.requesterNameId as string,
+    accountantNameId: (r.accountantNameId as string) ?? null,
     vendorId: r.vendorId as string,
     title: r.title as string,
     note: (r.note as string) ?? '',
@@ -108,7 +109,7 @@ function mapAttachment(a: Row): Attachment {
 
 /** Pulls the whole working set in five parallel calls. */
 export async function fetchDb(): Promise<Db> {
-  const [departments, users, projects, categories, requesterNames, vendors, requests, notifications, audit, holidays, config] =
+  const [departments, users, projects, categories, requesterNames, vendors, accountantNames, requests, notifications, audit, holidays, config] =
     await Promise.all([
       api.departments() as Promise<Row[]>,
       api.users() as Promise<Row[]>,
@@ -116,6 +117,7 @@ export async function fetchDb(): Promise<Db> {
       api.master('categories') as Promise<Row[]>,
       api.master('requesterNames') as Promise<Row[]>,
       api.master('vendors') as Promise<Row[]>,
+      api.master('accountantNames') as Promise<Row[]>,
       api.snapshot() as Promise<Row[]>,
       api.notifications() as Promise<Row[]>,
       api.history() as Promise<Row[]>,
@@ -148,6 +150,7 @@ export async function fetchDb(): Promise<Db> {
     projects: projects.map(mapMaster),
     categories: categories.map(mapMaster),
     requesterNames: requesterNames.map(mapMaster),
+    accountantNames: accountantNames.map(mapMaster),
     vendors: vendors.map(mapMaster),
     requests: requests.map(mapRequest),
     attachments,

@@ -1,14 +1,15 @@
 // Trưởng phòng Tài chính: duyệt B4 và theo dõi phiếu đang ở phía Kế toán (workflow §5.3, §9).
 import { useState } from 'react';
-import { CheckCircle2, Users } from 'lucide-react';
+import { CheckCircle2, Settings2, Users } from 'lucide-react';
 import { useDb, useMe } from '../../data/hooks';
 import { store } from '../../data/store';
 import { PRIORITY_LABEL, STATUS_LABEL, STATUS_STEP } from '../../domain/constants';
-import { queueItems, theAccountant } from '../../domain/permissions';
+import { canManageMaster, queueItems, theAccountant } from '../../domain/permissions';
 import type { PaymentRequest, Priority, Status } from '../../domain/types';
 import { formatMoney } from '../../lib/format';
 import { Button, Card, CardHeader, Checkpoint, EmptyState, Field, Input, Modal, Notice, PageHeader, Select, Stat } from '../../ui/primitives';
 import { toast } from '../../ui/toast';
+import { MasterDataPanel } from '../master-data/MasterDataPanel';
 import { RequestTable } from '../requests/RequestTable';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ export function CoordinationPage() {
     <>
       <PageHeader
         title="Chờ TPTC duyệt — B4"
-        description="Hồ sơ tạm ứng đã hoàn tất. Tick duyệt là phiếu chuyển thẳng cho tài khoản Kế toán; không phải chọn người."
+        description="Hồ sơ tạm ứng đã hoàn tất. Chọn nhân viên Kế toán tiếp nhận rồi tick duyệt để chuyển sang B5."
       />
       {!accountant && (
         <div className="mb-4">
@@ -74,9 +75,14 @@ function ApproveDialog({
   accountantName: string;
   onClose: () => void;
 }) {
+  const db = useDb();
+  const me = useMe();
   const [priority, setPriority] = useState<Priority | ''>('');
+  const [accountantNameId, setAccountantNameId] = useState('');
   const [note, setNote] = useState('');
   const [tick, setTick] = useState(false);
+  const [manage, setManage] = useState(false);
+  const staff = db.accountantNames.filter((x) => !x.deleted || x.id === accountantNameId);
 
   const submit = () => {
     let ok = 0;
@@ -84,13 +90,22 @@ function ApproveDialog({
       const fresh = store.getDb().requests.find((x) => x.id === r.id);
       if (!fresh) continue;
       try {
-        store.run({ type: 'FINANCE_APPROVE', id: r.id, version: fresh.version, confirmed: tick, priority: priority || null, note });
+        store.run({
+          type: 'FINANCE_APPROVE',
+          id: r.id,
+          version: fresh.version,
+          confirmed: tick,
+          priority: priority || null,
+          accountantNameId,
+          note,
+        });
         ok++;
       } catch (e) {
         toast.error(e);
       }
     }
-    if (ok) toast.success(`Đã duyệt và chuyển ${ok}/${requests.length} phiếu cho ${accountantName}`);
+    const who = db.accountantNames.find((x) => x.id === accountantNameId)?.name ?? accountantName;
+    if (ok) toast.success(`Đã duyệt và giao ${ok}/${requests.length} phiếu cho ${who}`);
     onClose();
   };
 
@@ -103,16 +118,41 @@ function ApproveDialog({
           <Button variant="secondary" onClick={onClose}>
             Hủy
           </Button>
-          <Button disabled={!tick || !priority} onClick={submit}>
+          <Button disabled={!tick || !priority || !accountantNameId} onClick={submit}>
             <CheckCircle2 className="h-4 w-4" /> Duyệt và chuyển
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <Notice tone="info" title="Kế toán tiếp nhận">
-          {accountantName} — hệ thống tự điền, Phòng Kế Toán chỉ có một tài khoản.
-        </Notice>
+        <Field
+          label={
+            <span className="flex items-center justify-between gap-2">
+              Nhân viên Kế toán tiếp nhận
+              {canManageMaster(me, 'accountantNames') && (
+                <button
+                  type="button"
+                  onClick={() => setManage(true)}
+                  className="inline-flex items-center gap-1 text-[11px] font-normal text-brand-700 hover:underline"
+                >
+                  <Settings2 className="h-3 w-3" /> Quản lý
+                </button>
+              )}
+            </span>
+          }
+          required
+          htmlFor="batch-accountant"
+          hint={`Tên hiện trên phiếu cho cả hai bên; phiếu vẫn vào tài khoản ${accountantName}`}
+        >
+          <Select id="batch-accountant" value={accountantNameId} onChange={(e) => setAccountantNameId(e.target.value)}>
+            <option value="">— Chọn —</option>
+            {staff.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <Field label="Độ ưu tiên" required htmlFor="batch-prio" hint="Dùng để sắp xếp hàng đợi B5 và B7 của Kế toán">
           <Select id="batch-prio" value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
             <option value="">— Chọn —</option>
@@ -130,6 +170,11 @@ function ApproveDialog({
           TPTC duyệt và chuyển Kế toán
         </Checkpoint>
       </div>
+      {manage && (
+        <Modal title="Danh mục Nhân viên kế toán" onClose={() => setManage(false)} wide>
+          <MasterDataPanel kind="accountantNames" />
+        </Modal>
+      )}
     </Modal>
   );
 }
@@ -164,7 +209,8 @@ export function FinanceMonitorPage() {
       </div>
       {accountant && (
         <p className="mb-4 text-sm text-slate-600">
-          Kế toán phụ trách: <b className="text-slate-900">{accountant.fullName}</b> ({accountant.username})
+          Kế toán phụ trách: <b className="text-slate-900">{accountant.fullName}</b> ({accountant.username}) — tên người
+          nhận từng phiếu hiện trong cột Kế toán phụ trách ở bảng bên dưới
         </p>
       )}
       {items.length === 0 ? (

@@ -64,7 +64,7 @@ export interface Department {
   kind: DepartmentKind;
 }
 
-export type MasterKind = 'projects' | 'categories' | 'requesterNames' | 'vendors';
+export type MasterKind = 'projects' | 'categories' | 'requesterNames' | 'vendors' | 'accountantNames';
 
 export interface MasterItem {
   id: string;
@@ -126,6 +126,8 @@ export interface PaymentRequest {
   projectId: string;
   categoryId: string;
   requesterNameId: string;
+  /** Nhân viên Kế toán do TPTC chỉ định ở B4; trống khi phiếu chưa qua bước đó. */
+  accountantNameId: string | null;
   vendorId: string;
   title: string;
   note: string;
@@ -198,6 +200,7 @@ export interface Db {
   projects: MasterItem[];
   categories: MasterItem[];
   requesterNames: MasterItem[];
+  accountantNames: MasterItem[];
   vendors: MasterItem[];
   requests: PaymentRequest[];
   attachments: Attachment[];

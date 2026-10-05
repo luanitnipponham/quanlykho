@@ -112,7 +112,14 @@ xem [deploy.md §5](deploy.md).
 
 ### 3.1. B4 — TPTC duyệt và chuyển Kế toán
 
-- Hệ thống **tự điền** tài khoản Kế toán duy nhất đang hoạt động; TPTC không chọn người.
+- TPTC **bắt buộc chọn** nhân viên Kế toán tiếp nhận từ danh mục `accountantNames`; thiếu thì
+  `ERR_REQUIRED_FIELD`. Tên này lưu ở `payment_requests.accountant_name_id` và hiện trên form
+  của cả TPTC lẫn Kế toán (B5, B7) cùng trang chi tiết phiếu.
+- **Tài khoản** nhận phiếu vẫn do hệ thống tự điền — Phòng Kế toán chỉ có một tài khoản đăng nhập.
+  Hai thứ khác nhau: `assigned_accountant_id` là tài khoản để phân quyền, `accountant_name_id`
+  là người thật chịu trách nhiệm.
+- Danh mục `accountantNames` do **TPTC và Admin** quản lý (Thêm / Sửa / Xóa), khác các danh mục
+  còn lại vốn do NV Cung ứng giữ — vì chính TPTC là người chỉ định.
 - Không còn Kế toán nào hoạt động → `ERR_NO_ACCOUNTANT`, phiếu giữ nguyên B4, Admin nhận thông báo.
 - Không có nhánh phân công nhiều người, không có điều hướng sang kế toán khác, không có cơ chế TPTC tự xử lý thay. Kế toán vắng mặt: Admin dùng A1 hoặc tick thay.
 

@@ -82,7 +82,7 @@ class World {
   }
   toB5() {
     this.toB4();
-    this.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority: 'HIGH' });
+    this.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority: 'HIGH', accountantNameId: 'ktn-1' });
   }
   toB6() {
     this.toB5();
@@ -241,13 +241,17 @@ describe('B3, B4 and B5', () => {
   it('B4 needs the tick and a priority, auto-assigns the accountant and posts the coordination note', () => {
     const w = new World();
     w.toB4();
-    expectCode(() => w.t(TC, { type: 'FINANCE_APPROVE', confirmed: false, priority: 'HIGH' }), 'ERR_PAYMENT_NO_CONFIRM');
-    expectCode(() => w.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority: null }), 'ERR_REQUIRED_FIELD');
-    expectCode(() => w.t(KT, { type: 'FINANCE_APPROVE', confirmed: true, priority: 'HIGH' }), 'ERR_FORBIDDEN');
-    w.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority: 'HIGH', note: 'Chi gấp cho NCC' });
+    expectCode(() => w.t(TC, { type: 'FINANCE_APPROVE', confirmed: false, priority: 'HIGH', accountantNameId: 'ktn-1' }), 'ERR_PAYMENT_NO_CONFIRM');
+    expectCode(() => w.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority: null, accountantNameId: 'ktn-1' }), 'ERR_REQUIRED_FIELD');
+    expectCode(() => w.t(KT, { type: 'FINANCE_APPROVE', confirmed: true, priority: 'HIGH', accountantNameId: 'ktn-1' }), 'ERR_FORBIDDEN');
+    // B4 phải chỉ định nhân viên Kế toán; tên này hiện trên form của cả TPTC lẫn Kế toán.
+    expectCode(() => w.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority: 'HIGH', accountantNameId: '' }), 'ERR_REQUIRED_FIELD');
+    expectCode(() => w.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority: 'HIGH', accountantNameId: 'khong-co' }), 'ERR_NOT_FOUND');
+    w.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority: 'HIGH', accountantNameId: 'ktn-1', note: 'Chi gấp cho NCC' });
     assert.equal(w.pr.status, 'ADVANCE_PAYMENT');
     assert.equal(w.pr.assignedAccountantId, theAccountant(w.db)!.id);
     assert.equal(w.pr.priority, 'HIGH');
+    assert.equal(w.pr.accountantNameId, 'ktn-1');
     assert.ok(w.db.comments.some((c) => c.requestId === w.id && c.content.startsWith('[TÀI CHÍNH ĐIỀU PHỐI]')));
     assert.ok(w.db.notifications.some((n) => n.userId === KT && n.title.includes('tạm ứng')));
   });
@@ -257,7 +261,7 @@ describe('B3, B4 and B5', () => {
     w.toB4();
     w.admin(ADMIN, { type: 'SET_USER_STATUS', userId: KT, status: 'LOCKED' });
     try {
-      w.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority: 'LOW' });
+      w.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority: 'LOW', accountantNameId: 'ktn-1' });
       assert.fail('expected ERR_NO_ACCOUNTANT');
     } catch (e) {
       assert.ok(e instanceof DomainError && e.code === 'ERR_NO_ACCOUNTANT' && e.alertAdmins);

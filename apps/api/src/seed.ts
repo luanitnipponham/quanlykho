@@ -41,6 +41,10 @@ const REQUESTER_NAMES = [
   ['KS-02', 'Kỹ sư giám sát – Ngô Thanh Tâm'],
   ['HC-01', 'Hành chính – Lý Thu Trang'],
 ];
+const ACCOUNTANT_NAMES = [
+  ['KT-01', 'Kế toán viên – Đỗ Thị Thu'],
+  ['KT-02', 'Kế toán viên – Vũ Minh Khoa'],
+];
 const VENDORS = [
   ['NCC-001', 'Công ty TNHH Thép Việt Á'],
   ['NCC-002', 'Công ty CP Bê tông Hà Nội'],
@@ -87,6 +91,7 @@ async function main(): Promise<void> {
     await seedMaster(prisma, 'category', CATEGORIES);
     await seedMaster(prisma, 'requesterName', REQUESTER_NAMES);
     await seedMaster(prisma, 'vendor', VENDORS);
+    await seedMaster(prisma, 'accountantName', ACCOUNTANT_NAMES);
   }
 
   for (const [date, name] of [
@@ -110,7 +115,7 @@ async function main(): Promise<void> {
   if (!WITH_DEMO) console.log('[seed] bỏ qua danh mục và phiếu mẫu (đặt SEED_DEMO=true nếu muốn dữ liệu demo)');
 }
 
-async function seedMaster(db: Client, model: 'project' | 'category' | 'requesterName' | 'vendor', rows: string[][]) {
+async function seedMaster(db: Client, model: 'project' | 'category' | 'requesterName' | 'vendor' | 'accountantName', rows: string[][]) {
   for (const [code, name] of rows) {
     const existing = await (db[model] as never as { findFirst: (a: unknown) => Promise<{ id: string } | null> }).findFirst({ where: { name } });
     if (!existing) await (db[model] as never as { create: (a: unknown) => Promise<unknown> }).create({ data: { code, name } });

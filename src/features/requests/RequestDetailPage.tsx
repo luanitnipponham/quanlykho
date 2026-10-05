@@ -166,7 +166,10 @@ function Responsibility({ pr }: { pr: PaymentRequest }) {
       <dl className="grid gap-3 p-5 text-sm">
         <Info label="NV cung ứng phụ trách" value={userName(db, pr.assignedRequesterId)} />
         <Info label="Lãnh đạo duyệt B2" value={leaders.map((l) => l.fullName).join(', ') || 'Chưa có tài khoản Lãnh đạo — báo Admin'} />
-        <Info label="Kế toán phụ trách" value={pr.assignedAccountantId ? userName(db, pr.assignedAccountantId) : 'Chưa phân công'} />
+        <Info
+          label="Kế toán phụ trách"
+          value={pr.accountantNameId ? masterName(db, 'accountantNames', pr.accountantNameId) : 'Chưa phân công'}
+        />
         {pr.priority && <Info label="Độ ưu tiên" value={PRIORITY_LABEL[pr.priority]} />}
       </dl>
     </Card>

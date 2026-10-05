@@ -29,13 +29,15 @@ const MASTER_LABEL: Record<MasterKind, string> = {
   projects: 'Dự án',
   categories: 'Hạng mục chi',
   requesterNames: 'Người yêu cầu',
+  accountantNames: 'Nhân viên kế toán',
   vendors: 'Nhà cung cấp',
 };
 
-const MASTER_FIELD: Record<MasterKind, 'projectId' | 'categoryId' | 'requesterNameId' | 'vendorId'> = {
+const MASTER_FIELD: Record<MasterKind, 'projectId' | 'categoryId' | 'requesterNameId' | 'vendorId' | 'accountantNameId'> = {
   projects: 'projectId',
   categories: 'categoryId',
   requesterNames: 'requesterNameId',
+  accountantNames: 'accountantNameId',
   vendors: 'vendorId',
 };
 

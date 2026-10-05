@@ -65,7 +65,7 @@ export type WorkflowAction =
   | ({ type: 'LEADER_APPROVE'; confirmed: boolean; note?: string } & Versioned)
   | ({ type: 'LEADER_REJECT' | 'LEADER_RETURN'; reason: string } & Versioned)
   | ({ type: 'SUBMIT_ADVANCE'; confirmed: boolean; advanceAmount: number } & Versioned)
-  | ({ type: 'FINANCE_APPROVE'; confirmed: boolean; priority: Priority | null; note?: string } & Versioned)
+  | ({ type: 'FINANCE_APPROVE'; confirmed: boolean; priority: Priority | null; accountantNameId: string; note?: string } & Versioned)
   | ({ type: 'PAY_ADVANCE'; checkedDocs: boolean; paid: boolean; method: PaymentMethod | null; paidDate: string } & Versioned)
   | ({ type: 'SUBMIT_SETTLEMENT'; confirmed: boolean; settlementAmount: number } & Versioned)
   | ({ type: 'PAY_FINAL'; checkedDocs: boolean; completed: boolean; method: PaymentMethod | null; paidDate: string } & Versioned)
@@ -337,6 +337,7 @@ function apply(db: Db, actor: User, action: WorkflowAction, now: Date): Workflow
         createdByRole: actor.role,
         assignedRequesterId,
         assignedAccountantId: null,
+        accountantNameId: null,
         ...fields,
         advanceAmount: null,
         settlementAmount: null,
@@ -507,6 +508,9 @@ function apply(db: Db, actor: User, action: WorkflowAction, now: Date): Workflow
       const pr = guard(db, actor, action.id, action.version, 'FINANCE_APPROVE');
       requireTick(action.confirmed, 'TPTC duyệt và chuyển Kế toán');
       if (!action.priority) fail('ERR_REQUIRED_FIELD', 'Chọn Độ ưu tiên');
+      if (!action.accountantNameId) fail('ERR_REQUIRED_FIELD', 'Chọn Nhân viên kế toán tiếp nhận');
+      const who = db.accountantNames.find((x) => x.id === action.accountantNameId && !x.deleted);
+      if (!who) fail('ERR_NOT_FOUND', 'Nhân viên kế toán không hợp lệ hoặc đã bị xóa');
       const accountant = theAccountant(db);
       if (!accountant) {
         fail('ERR_NO_ACCOUNTANT', 'Không còn tài khoản Kế toán đang hoạt động. Đã báo Admin.', {
@@ -516,6 +520,7 @@ function apply(db: Db, actor: User, action: WorkflowAction, now: Date): Workflow
         });
       }
       pr.assignedAccountantId = accountant.id;
+      pr.accountantNameId = action.accountantNameId;
       pr.priority = action.priority;
       const note = action.note?.trim();
       transition(db, pr, 'T7', 'ADVANCE_PAYMENT', me, note || null, now);
@@ -525,11 +530,11 @@ function apply(db: Db, actor: User, action: WorkflowAction, now: Date): Workflow
         [accountant.id],
         pr.id,
         'Phiếu đã chuyển cho bạn để thực hiện tạm ứng (B5)',
-        `${pr.code} – ưu tiên ${PRIORITY_LABEL[action.priority]}`,
+        `${pr.code} – ưu tiên ${PRIORITY_LABEL[action.priority]}, TPTC giao cho ${who.name}`,
         now,
       );
-      audit(db, me, 'T7', 'payment_request', pr.id, `${pr.code}: TPTC duyệt, chuyển ${accountant.username}`, now);
-      return { requestId: pr.id, message: `Đã duyệt và chuyển phiếu cho ${accountant.fullName} (B5)` };
+      audit(db, me, 'T7', 'payment_request', pr.id, `${pr.code}: TPTC duyệt, giao ${who.name}`, now);
+      return { requestId: pr.id, message: `Đã duyệt và giao phiếu cho ${who.name} (B5)` };
     }
 
     // ----- B5 --------------------------------------------------------------

@@ -77,7 +77,7 @@ Body tạo phiếu:
 | `POST` | `/payment-requests/:id/leader-reject` | T4 | LEADER_APPROVAL → REJECTED | `{ reason }` |
 | `POST` | `/payment-requests/:id/leader-return` | T5 | LEADER_APPROVAL → DRAFT | `{ reason }` |
 | `POST` | `/payment-requests/:id/submit-advance` | T6 | ADVANCE_PREPARATION → COORDINATION | `{ confirmed: true, advanceAmount }` |
-| `POST` | `/payment-requests/:id/finance-approve` | T7 | COORDINATION → ADVANCE_PAYMENT | `{ confirmed: true, priority, note? }` |
+| `POST` | `/payment-requests/:id/finance-approve` | T7 | COORDINATION → ADVANCE_PAYMENT | `{ confirmed: true, priority, accountantNameId, note? }` |
 | `POST` | `/payment-requests/:id/pay-advance` | T8 | ADVANCE_PAYMENT → AFTER_ADVANCE | `{ checkedDocs: true, paid: true, method, paidDate }` |
 | `POST` | `/payment-requests/:id/submit-settlement` | T9 | AFTER_ADVANCE → FINAL_PAYMENT | `{ confirmed: true, settlementAmount }` |
 | `POST` | `/payment-requests/:id/pay-final` | T10→T11/T12 | FINAL_PAYMENT → COMPLETED \| DOCUMENT_SUPPLEMENT_REQUIRED | `{ checkedDocs: true, completed: true, method?, paidDate }` |
@@ -127,8 +127,8 @@ File ghi xuống `/CHUNG_TU/{CUNG_UNG|KE_TOAN}/{YYYY-MM-DD}/{MA_PHIEU}/{file_nam
 
 | Method | Endpoint | Quyền |
 |---|---|---|
-| `GET` | `/master-data/:kind` | Tất cả. `kind` ∈ `projects`, `categories`, `requesterNames`, `vendors` |
-| `POST` / `PATCH` / `DELETE` | `/master-data/:kind[/:id]` | NV cung ứng, Admin. DELETE là xóa mềm |
+| `GET` | `/master-data/:kind` | Tất cả. `kind` ∈ `projects`, `categories`, `requesterNames`, `vendors`, `accountantNames` |
+| `POST` / `PATCH` / `DELETE` | `/master-data/:kind[/:id]` | NV cung ứng, Admin. Riêng `accountantNames`: TPTC, Admin. DELETE là xóa mềm |
 | `GET` | `/departments` | Tất cả — 4 phòng cố định kèm người thuộc phòng |
 | `PATCH` | `/departments/:id` | Admin — chỉ đổi `code`, `name` |
 | `GET` | `/users` | Tất cả (không trả mật khẩu) |

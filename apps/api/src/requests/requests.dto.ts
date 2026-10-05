@@ -55,6 +55,8 @@ export class SubmitAdvanceDto extends VersionDto {
 export class FinanceApproveDto extends VersionDto {
   @IsBoolean() confirmed: boolean;
   @IsIn(['HIGH', 'MEDIUM', 'LOW']) priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  /** Nhân viên Kế toán do TPTC chỉ định nhận phiếu (B4). */
+  @IsString() accountantNameId: string;
   @IsOptional() @IsString() note?: string;
 }
 

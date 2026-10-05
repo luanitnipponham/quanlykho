@@ -50,6 +50,10 @@ const REQUESTER_NAMES = [
   item('rqn-2', 'KS-02', 'Kỹ sư giám sát – Ngô Thanh Tâm'),
   item('rqn-3', 'HC-01', 'Hành chính – Lý Thu Trang'),
 ];
+const ACCOUNTANT_NAMES = [
+  item('ktn-1', 'KT-01', 'Kế toán viên – Đỗ Thị Thu'),
+  item('ktn-2', 'KT-02', 'Kế toán viên – Vũ Minh Khoa'),
+];
 const VENDORS = [
   item('ven-1', 'NCC-001', 'Công ty TNHH Thép Việt Á'),
   item('ven-2', 'NCC-002', 'Công ty CP Bê tông Hà Nội'),
@@ -81,6 +85,7 @@ export function emptyDb(hashFor: (userId: string) => string, now: Date): Db {
     projects: structuredClone(PROJECTS),
     categories: structuredClone(CATEGORIES),
     requesterNames: structuredClone(REQUESTER_NAMES),
+    accountantNames: structuredClone(ACCOUNTANT_NAMES),
     vendors: structuredClone(VENDORS),
     requests: [],
     attachments: [],
@@ -220,7 +225,7 @@ class Script {
 
   /** B4 → B5. */
   toB5(priority: 'HIGH' | 'MEDIUM' | 'LOW', note?: string): this {
-    return this.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority, note });
+    return this.t(TC, { type: 'FINANCE_APPROVE', confirmed: true, priority, accountantNameId: 'ktn-1', note });
   }
 
   /** B5 → B6. */

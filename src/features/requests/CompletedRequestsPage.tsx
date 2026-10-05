@@ -91,6 +91,7 @@ export function CompletedRequestsPage() {
         masterName(db, 'vendors', pr.vendorId),
         userName(db, pr.assignedRequesterId),
         userName(db, pr.assignedAccountantId),
+        masterName(db, 'accountantNames', pr.accountantNameId),
       ]
         .join(' ')
         .toLowerCase();
@@ -225,7 +226,11 @@ export function CompletedRequestsPage() {
                       {/* Accountant */}
                       <td className="px-4 py-3 text-slate-700">
                         <p className="font-medium text-xs text-slate-900">
-                          {pr.assignedAccountantId ? userName(db, pr.assignedAccountantId) : '—'}
+                          {pr.accountantNameId
+                            ? masterName(db, 'accountantNames', pr.accountantNameId)
+                            : pr.assignedAccountantId
+                              ? userName(db, pr.assignedAccountantId)
+                              : '—'}
                         </p>
                         <p className="text-[11px] text-slate-500">Phòng Kế Toán</p>
                       </td>

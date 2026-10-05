@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CurrentUser, Roles } from '../common/common';
 import { ROLE_DEPT_KIND, deny, fail, type Actor, type Role } from '../common/domain';
 
-const MASTER = ['projects', 'categories', 'requesterNames', 'vendors'] as const;
+const MASTER = ['projects', 'categories', 'requesterNames', 'vendors', 'accountantNames'] as const;
 type MasterKind = (typeof MASTER)[number];
 
 const MASTER_LABEL: Record<MasterKind, string> = {
@@ -14,13 +14,15 @@ const MASTER_LABEL: Record<MasterKind, string> = {
   categories: 'Hạng mục chi',
   requesterNames: 'Người yêu cầu',
   vendors: 'Nhà cung cấp',
+  accountantNames: 'Nhân viên kế toán',
 };
 
-const MASTER_FK: Record<MasterKind, 'projectId' | 'categoryId' | 'requesterNameId' | 'vendorId'> = {
+const MASTER_FK: Record<MasterKind, 'projectId' | 'categoryId' | 'requesterNameId' | 'vendorId' | 'accountantNameId'> = {
   projects: 'projectId',
   categories: 'categoryId',
   requesterNames: 'requesterNameId',
   vendors: 'vendorId',
+  accountantNames: 'accountantNameId',
 };
 
 export class MasterDto {
@@ -52,11 +54,12 @@ export class CatalogService {
   /** URL uses the plural kind; the Prisma model accessor is singular. */
   private model(kind: MasterKind) {
     if (!MASTER.includes(kind)) fail('ERR_NOT_FOUND', 'Danh mục không hợp lệ');
-    const modelOf: Record<MasterKind, 'project' | 'category' | 'requesterName' | 'vendor'> = {
+    const modelOf: Record<MasterKind, 'project' | 'category' | 'requesterName' | 'vendor' | 'accountantName'> = {
       projects: 'project',
       categories: 'category',
       requesterNames: 'requesterName',
       vendors: 'vendor',
+      accountantNames: 'accountantName',
     };
     return this.prisma[modelOf[kind]] as never as {
       findMany: (a?: unknown) => Promise<{ id: string; code: string; name: string; deleted: boolean }[]>;
@@ -70,13 +73,20 @@ export class CatalogService {
     return this.model(kind).findMany({ where: { deleted: false }, orderBy: { name: 'asc' } });
   }
 
-  /** Master data is editable by NV cung ứng and Admin; everyone else is read-only (workflow §8.1). */
-  private assertMasterWriter(actor: Actor) {
+  /**
+   * Danh mục nghiệp vụ do NV Cung ứng và Admin giữ (workflow §8.1).
+   * Riêng danh sách nhân viên Kế toán do TPTC giữ, vì chính TPTC chỉ định người nhận phiếu ở B4.
+   */
+  private assertMasterWriter(actor: Actor, kind: MasterKind) {
+    if (kind === 'accountantNames') {
+      if (actor.role !== 'FINANCE_MANAGER' && actor.role !== 'ADMIN') deny('Chỉ Trưởng phòng Tài chính và Admin sửa được danh mục này');
+      return;
+    }
     if (actor.role !== 'REQUESTER' && actor.role !== 'ADMIN') deny('Bạn chỉ được xem danh mục này');
   }
 
   async saveMaster(actor: Actor, kind: MasterKind, id: string | null, dto: MasterDto) {
-    this.assertMasterWriter(actor);
+    this.assertMasterWriter(actor, kind);
     const name = dto.name.trim();
     if (!name) fail('ERR_REQUIRED_FIELD', 'Nhập tên');
     const dup = await this.model(kind).findMany({ where: { deleted: false, name: { equals: name, mode: 'insensitive' }, NOT: id ? { id } : undefined } });
@@ -89,7 +99,7 @@ export class CatalogService {
   }
 
   async deleteMaster(actor: Actor, kind: MasterKind, id: string) {
-    this.assertMasterWriter(actor);
+    this.assertMasterWriter(actor, kind);
     const item = await this.model(kind).findUnique({ where: { id } });
     if (!item || item.deleted) fail('ERR_NOT_FOUND', 'Không tìm thấy mục');
     const used = await this.prisma.paymentRequest.count({

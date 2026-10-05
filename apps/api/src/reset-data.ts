@@ -30,6 +30,7 @@ async function main(): Promise<void> {
     categories: (await prisma.category.deleteMany()).count,
     requesterNames: (await prisma.requesterName.deleteMany()).count,
     vendors: (await prisma.vendor.deleteMany()).count,
+    accountantNames: (await prisma.accountantName.deleteMany()).count,
   };
 
   // Ổ đĩa phải khớp database: xoá nội dung CHUNG_TU nhưng giữ lại cây thư mục gốc.

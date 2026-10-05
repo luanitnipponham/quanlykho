@@ -209,6 +209,19 @@ model RequesterName {
   @@map("requester_names")
 }
 
+/// Tên nhân viên Phòng Kế toán. Phòng chỉ có một tài khoản đăng nhập nhưng nhiều
+/// người làm, nên TPTC chỉ định ai nhận phiếu ở B4 (workflow §6.4).
+model AccountantName {
+  id        String           @id @default(uuid())
+  code      String
+  name      String
+  deleted   Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+  requests  PaymentRequest[]
+
+  @@map("accountant_names")
+}
+
 model Vendor {
   id        String           @id @default(uuid())
   code      String
@@ -241,6 +254,8 @@ model PaymentRequest {
   categoryId      String @map("category_id")
   requesterNameId String @map("requester_name_id")
   vendorId        String @map("vendor_id")
+  /// Nhân viên Kế toán do TPTC chỉ định ở B4; trống khi phiếu chưa qua bước đó.
+  accountantNameId String? @map("accountant_name_id")
 
   title String
   note  String  @default("")
@@ -272,6 +287,7 @@ model PaymentRequest {
   project            Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
   category           Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   requesterName      RequesterName @relation(fields: [requesterNameId], references: [id], onDelete: Restrict)
+  accountantName     AccountantName? @relation(fields: [accountantNameId], references: [id], onDelete: Restrict)
   vendor             Vendor        @relation(fields: [vendorId], references: [id], onDelete: Restrict)
 
   attachments  Attachment[]
