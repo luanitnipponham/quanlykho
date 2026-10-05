@@ -40,6 +40,19 @@ ok()   { printf '    %s[ok]%s %s\n' "$GREEN" "$OFF" "$1"; }
 warn() { printf '    %s[!]%s  %s\n' "$YELLOW" "$OFF" "$1"; }
 die()  { printf '\n%sLOI:%s %s\n' "$RED" "$OFF" "$1" >&2; exit 1; }
 
+# `set -e` giet script ma khong in gi, rat kho doan khi chay tren may chu.
+# Bay nay in ro dong lenh nao hong truoc khi thoat.
+on_err() {
+  echo "" >&2
+  echo "${RED}LOI:${OFF} script dung o dong ${1:-?} (ma thoat ${2:-?}). Lenh: ${3:-?}" >&2
+}
+trap 'on_err "$LINENO" "$?" "$BASH_COMMAND"' ERR
+
+# Doc mot bien trong file .env. grep khong khop se tra ve 1; duoi `set -e`
+# cong `pipefail` dieu do du de giet ca script ma khong in loi nao, nen boc
+# lai bang `|| true`: thieu dong trong .env chi cho ra chuoi rong.
+env_val() { grep -E "^$1=" "${2:-.env}" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
+
 # Docker can quyen root. Tu nang quyen de nguoi dung chi phai go "./deploy.sh".
 # -E giu lai cac bien tuy chon o tren.
 if [ "$(id -u)" -ne 0 ]; then
@@ -154,9 +167,9 @@ cd "$REPO_DIR"
 # docker compose tu doc file .env cua du an. Neu chi dat HTTP_PORT o do ma script
 # lai mac dinh 80 thi buoc kiem tra cuoi se do nham cong va bao that bai oan.
 if [ -f .env ]; then
-  [ -n "$HTTP_PORT_ARG" ] || HTTP_PORT_ENV=$(grep -E '^HTTP_PORT=' .env | tail -1 | cut -d= -f2- | tr -dc '0-9')
-  ARCHIVE_HOST_DIR="${ARCHIVE_HOST_DIR:-$(grep -E '^ARCHIVE_HOST_DIR=' .env | tail -1 | cut -d= -f2-)}"
-  NAS_HOST="${NAS_HOST:-$(grep -E '^NAS_HOST=' .env | tail -1 | cut -d= -f2-)}"
+  [ -n "$HTTP_PORT_ARG" ] || HTTP_PORT_ENV=$(env_val HTTP_PORT | tr -dc '0-9')
+  ARCHIVE_HOST_DIR="${ARCHIVE_HOST_DIR:-$(env_val ARCHIVE_HOST_DIR)}"
+  NAS_HOST="${NAS_HOST:-$(env_val NAS_HOST)}"
 fi
 HTTP_PORT="${HTTP_PORT_ARG:-${HTTP_PORT_ENV:-80}}"
 
@@ -227,7 +240,7 @@ else
   ok "Da sinh deploy/app.env voi mat khau va JWT_SECRET ngau nhien"
 fi
 
-SEED_PW=$(grep -E '^SEED_PASSWORD=' deploy/app.env | cut -d= -f2- || true)
+SEED_PW=$(env_val SEED_PASSWORD deploy/app.env)
 [ -n "$SEED_PW" ] || SEED_PW='Password@123'
 
 # ---------------------------------------------------------------------------
