@@ -202,6 +202,23 @@ else
   fi
 fi
 
+# Buoc dong bo o tren vua ghi de chinh deploy.sh, neu ban moi co sua no. Bash
+# doc tiep tu ban cu dang mo, nen thay doi chi co hieu luc o lan chay sau -
+# "mot lenh" hoa ra phai chay hai lan moi dung. Chay lai ngay ban vua keo ve.
+# Dat o day vi chua dung toi docker, chay lai khong bo do viec gi.
+# DEPLOY_RELOADED chan lap vo han.
+DEPLOY_CHANGED=0
+if [ -n "${BEFORE:-}" ] && [ "${BEFORE:-}" != "${AFTER:-}" ] && [ -z "${DEPLOY_RELOADED:-}" ]; then
+  git diff --quiet "$BEFORE" "$AFTER" -- deploy.sh 2>/dev/null || DEPLOY_CHANGED=1
+fi
+if [ "$DEPLOY_CHANGED" = "1" ]; then
+  ok "deploy.sh vua duoc cap nhat - chay lai ban moi"
+  export DEPLOY_RELOADED=1
+  export HTTP_PORT RESET_DATA
+  [ -z "${PREBUILT:-}" ] || export PREBUILT
+  exec bash "$REPO_DIR/deploy.sh" "$@"
+fi
+
 if [ "${PREBUILT:-}" = "true" ]; then
   [ -f docker-compose.prod.yml ] || die "Khong thay docker-compose.prod.yml"
   COMPOSE=(docker compose -f docker-compose.prod.yml)
