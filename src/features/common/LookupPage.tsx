@@ -21,7 +21,7 @@ export function LookupPage({ title = 'Tra cứu hồ sơ', admin = false }: { ti
         title={title}
         description={
           admin
-            ? 'Toàn bộ phiếu. Mở phiếu để dùng thao tác đặc quyền (A1–A4, xóa). Phiếu Hoàn thành chỉ được xem.'
+            ? 'Toàn bộ phiếu. Mở phiếu để dùng thao tác đặc quyền (A1–A4, xóa) — áp dụng ở mọi bước, kể cả phiếu đã Hoàn thành.'
             : 'Mọi bộ phận xem và tải được toàn bộ hồ sơ để đối chiếu; chỉ xử lý được phiếu trong hàng đợi của mình.'
         }
       />

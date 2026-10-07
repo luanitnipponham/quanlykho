@@ -405,24 +405,24 @@ export function CompletedRequestsPage() {
                               </button>
                             ))}
 
-                          {/* Admin: Delete Request — phiếu chưa khép hồ sơ thì không xóa ở đây */}
-                          {isAdminUser && !waiting && (
+                          {/* Admin xóa được mọi phiếu, kể cả phiếu đã đủ chứng từ. Lõi nghiệp vụ
+                              và backend vốn đã cho phép (DELETE: mọi trạng thái); trước đây chỉ
+                              nút bấm tự khóa lại. Hộp xác nhận cảnh báo nặng hơn khi hồ sơ đủ. */}
+                          {isAdminUser && (
                             <button
                               onClick={() => {
                                 setDeletePr(pr);
-                                setDeleteReason(`Phiếu hoàn thành không hợp lệ do thiếu chứng từ: ${audit.missingDocuments.map((m) => m.label).join(', ')}`);
+                                setDeleteReason(
+                                  audit.isComplete
+                                    ? ''
+                                    : `Phiếu hoàn thành không hợp lệ do thiếu chứng từ: ${audit.missingDocuments.map((m) => m.label).join(', ')}`,
+                                );
                               }}
-                              disabled={audit.isComplete}
-                              className={cx(
-                                'rounded p-1.5 transition-colors',
-                                !audit.isComplete
-                                  ? 'text-red-500 hover:bg-red-50 hover:text-red-700'
-                                  : 'text-slate-300 cursor-not-allowed',
-                              )}
+                              className="rounded p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
                               title={
-                                !audit.isComplete
-                                  ? 'Admin: Xóa phiếu hoàn thành thiếu chứng từ'
-                                  : 'Phiếu đã đầy đủ chứng từ hợp lệ, không được xóa'
+                                audit.isComplete
+                                  ? 'Admin: Xóa vĩnh viễn phiếu này (hồ sơ đang đầy đủ — cân nhắc Lưu trữ thay vì xóa)'
+                                  : 'Admin: Xóa vĩnh viễn phiếu thiếu chứng từ'
                               }
                               aria-label={`Xóa ${pr.code}`}
                             >
@@ -770,7 +770,7 @@ export function CompletedRequestsPage() {
       {/* ------------------------------------------------------------------ */}
       {deletePr && (
         <Modal
-          title={`Xác nhận xóa phiếu hoàn thành — ${deletePr.code}`}
+          title={`Xác nhận xóa phiếu — ${deletePr.code}`}
           onClose={() => setDeletePr(null)}
           footer={
             <>
@@ -801,12 +801,29 @@ export function CompletedRequestsPage() {
           }
         >
           <div className="space-y-4">
-            <Notice tone="danger">
-              <p className="font-semibold text-red-900">Hành động này không thể hoàn tác!</p>
-              <p className="mt-1 text-sm text-red-800">
-                Phiếu <strong>{deletePr.code}</strong> (đang thiếu chứng từ) cùng toàn bộ tệp đính kèm và trao đổi liên quan sẽ bị xóa hoàn toàn khỏi hệ thống.
-              </p>
-            </Notice>
+            {(() => {
+              const a = checkCompletedAttachments(db, deletePr);
+              const tinhTrang = a.isComplete
+                ? 'hồ sơ đang ĐẦY ĐỦ chứng từ'
+                : `đang thiếu ${a.missingDocuments.length} chứng từ`;
+              return (
+                <>
+                  <Notice tone="danger">
+                    <p className="font-semibold text-red-900">Hành động này không thể hoàn tác!</p>
+                    <p className="mt-1 text-sm text-red-800">
+                      Phiếu <strong>{deletePr.code}</strong> ({tinhTrang}) cùng toàn bộ tệp đính kèm và trao đổi
+                      liên quan sẽ bị xóa hoàn toàn khỏi PostgreSQL và khỏi ổ đĩa máy chủ.
+                    </p>
+                  </Notice>
+                  {a.isComplete && (
+                    <Notice tone="warn" title="Phiếu này đủ chứng từ — cân nhắc Lưu trữ">
+                      Lưu trữ chuyển tệp sang NAS rồi xóa khỏi đĩa máy chủ nhưng <strong>giữ lại hồ sơ</strong> để
+                      tra cứu và phục hồi về sau. Xóa thì mất hẳn, không lấy lại được.
+                    </Notice>
+                  )}
+                </>
+              );
+            })()}
 
             <Field label="Lý do xóa phiếu (bắt buộc)" required htmlFor="del-reason">
               <Textarea
@@ -814,7 +831,7 @@ export function CompletedRequestsPage() {
                 rows={3}
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
-                placeholder="Nhập lý do xóa phiếu hoàn thành này..."
+                placeholder="Nhập lý do xóa phiếu này..."
               />
             </Field>
           </div>
