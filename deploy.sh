@@ -83,6 +83,11 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 install_pkg() {
+  # Khong root thi bao thang ra thay vi de apt-get nem loi quyen kho hieu.
+  if [ "$(id -u)" -ne 0 ]; then
+    warn "Can cai goi: $*. Chay khong root nen khong cai duoc. Cai thu cong: sudo apt-get install -y $*"
+    return 1
+  fi
   if   command -v apt-get >/dev/null 2>&1; then apt-get update -qq && apt-get install -y -qq "$@"
   elif command -v dnf     >/dev/null 2>&1; then dnf install -y "$@"
   elif command -v yum     >/dev/null 2>&1; then yum install -y "$@"
@@ -154,9 +159,19 @@ else
   ok "Da cai $(docker --version | cut -d, -f1)"
 fi
 
-systemctl enable --now docker >/dev/null 2>&1 || true
-docker info >/dev/null 2>&1 || die "Docker daemon khong chay. Kiem tra: systemctl status docker"
-ok "Docker daemon dang chay"
+# Daemon dang chay roi thi khong dung toi systemd nua. Quan trong: chay
+# `systemctl enable` bang quyen thuong se bi polkit chan va hoi mat khau NGAY
+# TREN TERMINAL; chuyen huong >/dev/null chi giau output cua systemctl chu
+# khong giau duoc loi nhac cua polkit, nen script dung im cho nguoi dung go.
+if docker info >/dev/null 2>&1; then
+  ok "Docker daemon dang chay"
+else
+  if [ "$(id -u)" -eq 0 ]; then
+    systemctl enable --now docker >/dev/null 2>&1 || true
+  fi
+  docker info >/dev/null 2>&1 || die "Docker daemon khong chay. Bat bang: sudo systemctl enable --now docker"
+  ok "Docker daemon dang chay"
+fi
 
 REAL_USER="${SUDO_USER:-}"
 if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
@@ -288,7 +303,12 @@ SEED_PW=$(env_val SEED_PASSWORD deploy/app.env)
 # ---------------------------------------------------------------------------
 step "5/7  Tuong lua"
 # ---------------------------------------------------------------------------
-if command -v ufw >/dev/null 2>&1; then
+# Mo cong la viec cua root. Chay khong root thi bo qua han: firewall-cmd di qua
+# polkit nen se hoi mat khau tren terminal y het systemctl, con ufw chi bao loi.
+# May da chay duoc roi thi cong von da mo, khong can lam gi.
+if [ "$(id -u)" -ne 0 ]; then
+  ok "Bo qua: khong chay bang root, giu nguyen tuong lua hien tai"
+elif command -v ufw >/dev/null 2>&1; then
   ufw allow OpenSSH >/dev/null 2>&1 || true
   ufw allow "${HTTP_PORT}/tcp" >/dev/null 2>&1 || true
   if ufw status 2>/dev/null | head -1 | grep -q inactive; then
