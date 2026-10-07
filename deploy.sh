@@ -63,12 +63,23 @@ trap 'on_err "$LINENO" "$?" "$BASH_COMMAND"' ERR
 # lai bang `|| true`: thieu dong trong .env chi cho ra chuoi rong.
 env_val() { grep -E "^$1=" "${2:-.env}" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 
-# Docker can quyen root. Tu nang quyen de nguoi dung chi phai go "./deploy.sh".
-# -E giu lai cac bien tuy chon o tren.
+# Lan dau tren may trang thi can root: cai Docker, tao swap, mo tuong lua, ghi
+# vao /opt. Nhung tren may da cai xong, mot lan cap nhat khong can gi ca -
+# tai khoan nam trong nhom "docker" va so huu thu muc ma nguon la du. Doi root
+# vo dieu kien khien script khong chay duoc qua SSH khong tuong tac, vi sudo
+# doi mat khau ma khong co terminal de go.
 if [ "$(id -u)" -ne 0 ]; then
-  command -v sudo >/dev/null 2>&1 || die "Can quyen root nhung khong co sudo. Dang nhap bang root roi chay lai."
-  printf '%s==> Can quyen root, dang goi sudo...%s\n' "$BOLD" "$OFF"
-  exec sudo -E bash "$0" "$@"
+  NEED_ROOT=0
+  docker info >/dev/null 2>&1 || NEED_ROOT=1   # chua cai Docker, hoac khong co quyen dung
+  SELF_DIR_EARLY=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  TARGET_DIR="${REPO_DIR:-$SELF_DIR_EARLY}"
+  [ -w "$TARGET_DIR" ] || NEED_ROOT=1          # khong ghi duoc vao thu muc ma nguon
+  if [ "$NEED_ROOT" = "1" ]; then
+    command -v sudo >/dev/null 2>&1 || die "Can quyen root nhung khong co sudo. Dang nhap bang root roi chay lai."
+    printf '%s==> Can quyen root, dang goi sudo...%s\n' "$BOLD" "$OFF"
+    exec sudo -E bash "$0" "$@"
+  fi
+  printf '%s==> Chay khong can root: da co Docker va quyen ghi%s\n' "$BOLD" "$OFF"
 fi
 
 install_pkg() {
@@ -90,7 +101,11 @@ MEM_MB=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
 SWAP_MB=$(awk '/SwapTotal/ {print int($2/1024)}' /proc/meminfo)
 if [ "$((MEM_MB + SWAP_MB))" -lt 1900 ] && [ "${PREBUILT:-}" != "true" ]; then
   warn "Chi co ${MEM_MB} MB RAM + ${SWAP_MB} MB swap; buoc build can khoang 2 GB."
-  if [ ! -f /swapfile ]; then
+  if [ "$(id -u)" -ne 0 ]; then
+    # Chay khong root (may da cai san). Tao swap bat buoc phai co root, nen bao
+    # roi di tiep thay vi chet giua chung.
+    warn "Khong co quyen root nen khong tao duoc swap. Dung PREBUILT=true de khoi phai build."
+  elif [ ! -f /swapfile ]; then
     fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
     chmod 600 /swapfile
     mkswap /swapfile >/dev/null
