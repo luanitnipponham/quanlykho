@@ -141,7 +141,7 @@ export function CreateRequestPage() {
     <>
       <PageHeader
         title="Tạo phiếu yêu cầu chi — B1"
-        description="Điền đủ thông tin và 2 file bắt buộc. Phiếu gửi đi chuyển thẳng Lãnh đạo duyệt (B2)."
+        description="Điền đủ thông tin và 2 file bắt buộc — thiếu file thì không lưu nháp được. Phiếu gửi đi chuyển thẳng Lãnh đạo duyệt (B2)."
       />
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <Card>
@@ -166,7 +166,7 @@ export function CreateRequestPage() {
         </Card>
         <div className="flex flex-col gap-6">
           <Card>
-            <CardHeader title="Hồ sơ đính kèm B1" subtitle="Đủ 2 ô mới gửi được" />
+            <CardHeader title="Hồ sơ đính kèm B1" subtitle="Bắt buộc đủ 2 ô mới lưu hoặc gửi được" />
             <div className="flex flex-col gap-2 p-4">
               {B1_SLOTS.map((s) => (
                 <PendingSlot key={s} slot={s} files={pending[s] ?? []} onChange={(f) => setPending({ ...pending, [s]: f })} />
@@ -176,15 +176,30 @@ export function CreateRequestPage() {
           <Card className="p-4">
             <div className="flex flex-col gap-3">
               {missingFiles.length > 0 && (
-                <Notice tone="warn">Còn thiếu: {missingFiles.map((s) => SLOT_DEF[s].label).join(', ')}. Có thể Lưu nháp rồi bổ sung sau.</Notice>
+                <Notice tone="warn">
+                  Còn thiếu: {missingFiles.map((s) => SLOT_DEF[s].label).join(', ')}. Đính kèm đủ 2 file mới lưu nháp
+                  hoặc gửi được.
+                </Notice>
               )}
               <Checkpoint checked={tick} onChange={setTick}>
                 Gửi Lãnh đạo
               </Checkpoint>
-              <Button onClick={() => save(true)} disabled={busy || !tick}>
+              {/* Thieu file thi chan ca hai duong: luu nhap cung khong cho. Phieu
+                  nhap do dang khong co chung tu chi nam lai lam rac hang doi, va
+                  backend se chan ngay khi bam gui. */}
+              <Button
+                onClick={() => save(true)}
+                disabled={busy || !tick || missingFiles.length > 0}
+                title={missingFiles.length > 0 ? 'Cần đính kèm đủ 2 file bắt buộc' : undefined}
+              >
                 <Send className="h-4 w-4" /> Gửi Lãnh đạo duyệt (B2)
               </Button>
-              <Button variant="secondary" onClick={() => save(false)} disabled={busy}>
+              <Button
+                variant="secondary"
+                onClick={() => save(false)}
+                disabled={busy || missingFiles.length > 0}
+                title={missingFiles.length > 0 ? 'Cần đính kèm đủ 2 file bắt buộc' : undefined}
+              >
                 <Save className="h-4 w-4" /> Lưu nháp
               </Button>
             </div>
