@@ -189,6 +189,13 @@ function DraftSubmit({ pr, onReason }: { pr: PaymentRequest; onReason: (r: Reaso
           ...(['REQUEST_FORM', 'QUOTATION_COMPARISON'] as Slot[]).map((s) => ({ ok: has(s), label: `File ${SLOT_DEF[s].label}` })),
         ]}
       />
+      {/* Hai o tai len ngay tai cho, giong B3/B5/B6/B7. Truoc day B1 la buoc duy
+          nhat chi bao "thieu file" ma khong co cho nop — phai keo xuong cuoi trang
+          moi thay the "Ho so dinh kem". */}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <AttachmentSlot pr={pr} slot="REQUEST_FORM" compact />
+        <AttachmentSlot pr={pr} slot="QUOTATION_COMPARISON" compact />
+      </div>
       <Checkpoint checked={tick} onChange={setTick}>
         Gửi Lãnh đạo
       </Checkpoint>
