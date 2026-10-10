@@ -29,6 +29,21 @@ export async function openAttachment(att: Attachment, mode: 'view' | 'download')
   }
 }
 
+/**
+ * Dinh dang trinh duyet mo xem duoc ngay. Cac dinh dang con lai trong danh sach
+ * cho phep (doc, docx, xls, xlsx) khong co trinh xem san, nen window.open se tai
+ * file ve — nut "Xem" khi do noi mot dang lam mot neo. Voi chung chi hien nut Tai ve.
+ *
+ * heic bi loai co chu y: Safari xem duoc nhung Chrome va Firefox thi khong,
+ * ma phan lon nguoi dung o day dung Chrome.
+ */
+const PREVIEWABLE_EXT = new Set(['pdf', 'png', 'jpg', 'jpeg', 'webp', 'txt', 'csv']);
+
+export function canPreviewInBrowser(fileName: string): boolean {
+  const ext = fileName.includes('.') ? fileName.split('.').pop()!.toLowerCase() : '';
+  return PREVIEWABLE_EXT.has(ext);
+}
+
 /** Which slots are mandatory at their step (workflow §8.2). */
 export function slotRequirement(pr: PaymentRequest, slot: Slot): 'required' | 'conditional' | 'optional' {
   if (slot === 'INVOICE') return pr.status === 'DOCUMENT_SUPPLEMENT_REQUIRED' ? 'required' : pr.hasInvoice ? 'conditional' : 'optional';
@@ -123,10 +138,17 @@ function FileRow({ att, canDelete, compact }: { att: Attachment; canDelete: bool
           </p>
         )}
       </div>
-      <button onClick={() => openAttachment(att, 'view')} className="rounded p-1 text-slate-500 hover:bg-white hover:text-slate-800" aria-label={`Xem ${att.fileName}`} title="Xem">
-        <Eye className="h-3.5 w-3.5" />
-      </button>
-      <button onClick={() => openAttachment(att, 'download')} className="rounded p-1 text-slate-500 hover:bg-white hover:text-slate-800" aria-label={`Tải về ${att.fileName}`} title="Tải về">
+      {canPreviewInBrowser(att.fileName) && (
+        <button onClick={() => openAttachment(att, 'view')} className="rounded p-1 text-slate-500 hover:bg-white hover:text-slate-800" aria-label={`Xem ${att.fileName}`} title="Xem trong tab mới">
+          <Eye className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <button
+        onClick={() => openAttachment(att, 'download')}
+        className="rounded p-1 text-slate-500 hover:bg-white hover:text-slate-800"
+        aria-label={`Tải về ${att.fileName}`}
+        title={canPreviewInBrowser(att.fileName) ? 'Tải về' : 'Tải về — định dạng này trình duyệt không xem trực tiếp được'}
+      >
         <Download className="h-3.5 w-3.5" />
       </button>
       {canDelete && (
