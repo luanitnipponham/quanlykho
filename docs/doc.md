@@ -102,7 +102,7 @@ Bốn phòng ban cố định, Admin chỉ đổi được tên/mã, không thê
 | # | Từ | Hành động | Người thực hiện | Điều kiện bắt buộc | Đến |
 |--|--|--|--|--|--|
 | T1 | B1 | ☑ Gửi Lãnh đạo | NV CU | Đủ field; Tổng tiền > 0; 2 file (Phiếu yêu cầu, Báo giá & bảng so sánh giá); còn ≥ 1 Lãnh đạo hoạt động | B2 |
-| T2 | B1 | Hủy đơn | NV CU | **Không cần lý do**; hủy rồi tạo phiếu mới | CANCELLED |
+| T2 | B1 | Hủy đơn | NV CU | **Không cần lý do**; xóa hẳn phiếu + tệp đính kèm | (phiếu biến mất) |
 | T3 | B2 | ☑ Lãnh đạo duyệt | Lãnh đạo | Không tự duyệt phiếu mình tạo | B3 |
 | T4 | B2 | Từ chối | Lãnh đạo | Bắt buộc lý do | REJECTED |
 | T5 | B2 | Trả lại | Lãnh đạo | Bắt buộc nội dung cần bổ sung | B1 |
@@ -158,7 +158,7 @@ Quy tắc thêm:
    Còn lại phải chi âm, nên chặn ngay tại ô nhập lẫn trong engine (`ERR_SETTLE_OVER_BUDGET`).
 3. **Khóa hồ sơ theo bước:** file và field chỉ sửa khi phiếu ở đúng bước và chưa tick. Riêng ô Hóa đơn mở ở B6, B7, B8.
 4. **Không áp dụng SoD** ngoài B2: hệ thống chỉ chặn việc tự duyệt phiếu mình tạo (T3).
-5. **Hủy phiếu chỉ có ở B1.** Từ B2 trở đi không phòng ban nào hủy được; chỉ Lãnh đạo có Từ chối / Trả lại. A2 của Admin ngoài ràng buộc này.
+5. **Hủy phiếu chỉ có ở B1, và là xóa hẳn** — không để lại bản ghi "Đã hủy". Từ B2 trở đi không phòng ban nào hủy được; chỉ Lãnh đạo có Từ chối / Trả lại. A2 của Admin ngoài ràng buộc này và vẫn cho ra trạng thái `CANCELLED`.
 6. B2 không định tuyến theo phòng ban: mọi Lãnh đạo đang hoạt động đều duyệt được.
 7. B8: scheduler chạy hằng ngày; quá 5 ngày làm việc (bỏ T7, CN, ngày lễ do Admin quản lý) → gắn cờ trễ hạn, nhắc NV CU và kế toán phụ trách. Cờ trễ hạn **không đổi trạng thái**.
 8. Độ ưu tiên chọn ở B4 dùng sắp xếp hàng đợi B5, B7.

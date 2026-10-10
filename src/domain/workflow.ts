@@ -459,11 +459,19 @@ function apply(db: Db, actor: User, action: WorkflowAction, now: Date): Workflow
     }
 
     case 'CANCEL': {
-      // Hủy đơn chỉ có ở B1 và không cần nhập lý do (workflow §6.5).
+      // Hủy đơn chỉ có ở B1 và không cần nhập lý do (workflow §6.5). Phiếu ở B1
+      // chưa ai duyệt, chưa phát sinh tiền hay trách nhiệm, nên giữ lại một bản
+      // ghi "Đã hủy" chỉ làm rác hàng đợi "Phiếu của tôi". Xóa hẳn, đúng tinh
+      // thần "hủy rồi thì tạo phiếu mới".
       const pr = guard(db, actor, action.id, action.version, 'CANCEL');
-      transition(db, pr, 'T2', 'CANCELLED', me, null, now);
-      audit(db, me, 'T2', 'payment_request', pr.id, `${pr.code}: hủy đơn ở B1`, now);
-      return { requestId: pr.id, message: 'Đã hủy phiếu. Cần chi thì tạo phiếu mới.' };
+      const removed = db.attachments.filter((a) => a.requestId === pr.id).map((a) => a.id);
+      db.requests = db.requests.filter((r) => r.id !== pr.id);
+      db.attachments = db.attachments.filter((a) => a.requestId !== pr.id);
+      db.comments = db.comments.filter((c) => c.requestId !== pr.id);
+      db.notifications = db.notifications.filter((n) => n.requestId !== pr.id);
+      // Vẫn ghi nhật ký: phiếu biến mất khỏi giao diện nhưng Admin tra được ai hủy.
+      audit(db, me, 'T2', 'payment_request', pr.id, `${pr.code}: hủy ở B1 — xóa khỏi hệ thống`, now);
+      return { removedAttachmentIds: removed, message: `Đã hủy và xóa phiếu ${pr.code}` };
     }
 
     // ----- B2 --------------------------------------------------------------

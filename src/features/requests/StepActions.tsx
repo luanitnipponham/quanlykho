@@ -2,6 +2,7 @@
 // A button only appears when domain/permissions allows that action for the signed-in role.
 import { useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock3, MessageSquareWarning, Settings2 } from 'lucide-react';
+import { navigate } from '../../app/router';
 import { useDb, useMe, useNow } from '../../data/hooks';
 import { store } from '../../data/store';
 import { METHOD_LABEL, PRIORITY_LABEL, SLOT_DEF, STATUS_LABEL, STATUS_STEP } from '../../domain/constants';
@@ -201,11 +202,17 @@ function DraftSubmit({ pr, onReason }: { pr: PaymentRequest; onReason: (r: Reaso
             onReason({
               title: 'Hủy đơn (T2)',
               label: 'Ghi chú (không bắt buộc)',
-              confirm: 'Hủy đơn',
+              confirm: 'Hủy và xóa phiếu',
               danger: true,
               optional: true,
-              intro: 'Hủy đơn chỉ có ở B1 và không cần nhập lý do. Hủy xong, cần chi thì tạo phiếu mới.',
-              run: () => run({ type: 'CANCEL', id: pr.id, version: pr.version }),
+              intro:
+                'Phiếu còn ở B1, chưa ai duyệt nên sẽ bị xóa hẳn khỏi hệ thống cùng mọi tệp đã đính kèm — không để lại phiếu "Đã hủy" trong danh sách. Cần chi thì tạo phiếu mới.',
+              run: async () => {
+                const ok = await run({ type: 'CANCEL', id: pr.id, version: pr.version });
+                // Phiếu không còn tồn tại, ở lại trang chi tiết sẽ là trang trống.
+                if (ok) navigate('/procurement/my-requests');
+                return ok;
+              },
             })
           }
         >

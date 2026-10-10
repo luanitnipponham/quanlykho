@@ -128,6 +128,7 @@ const CU = 'u-cu';
 const LD = 'u-ld';
 const TC = 'u-tc';
 const KT = 'u-kt';
+const AD = 'u-admin';
 
 class Script {
   db: Db;
@@ -337,9 +338,12 @@ export function buildSeed(hashFor: (userId: string) => string, now: Date): Db {
     .at(20)
     .finish('ve_sinh', 20);
 
-  // 11. CANCELLED — cancelled by the requester at B1 (no reason needed)
+  // 11. CANCELLED — Admin hủy bằng đặc quyền A2. NV cung ứng hủy ở B1 nay xóa hẳn
+  //     phiếu, nên A2 là con đường duy nhất còn dẫn tới trạng thái này.
   s.at(7).create({ title: 'Mua máy khoan cầm tay', categoryId: 'cat-4', vendorId: 'ven-3', requestedAmount: 12_000_000 }).b1Files('may_khoan');
-  s.t(CU, { type: 'CANCEL' });
+  s.t(CU, { type: 'SUBMIT', confirmed: true })
+    .at(6)
+    .t(AD, { type: 'ADMIN_CANCEL', reason: 'Dự án tạm dừng, không mua nữa.' });
 
   // 12. REJECTED — refused by Lãnh đạo
   s.at(10).create({ title: 'Sơn chống thấm mái – nhập khẩu', requestedAmount: 410_000_000 }).b1Files('son');

@@ -71,7 +71,7 @@ stateDiagram-v2
     [*] --> DRAFT: B1 Nhân viên CU tạo phiếu
 
     DRAFT --> LEADER_APPROVAL: T1 Gửi Lãnh đạo (NV CU)
-    DRAFT --> CANCELLED: T2 Hủy đơn
+    DRAFT --> [*]: T2 Hủy đơn (xóa hẳn phiếu)
 
     LEADER_APPROVAL --> ADVANCE_PREPARATION: T3 Lãnh đạo duyệt
     LEADER_APPROVAL --> REJECTED: T4 Lãnh đạo từ chối
@@ -109,7 +109,7 @@ Ghi chú: A1 (Force), A2 (Admin hủy), A4 (Chuyển giao NV CU) là thao tác �
 | # | Từ | Hành động | Người thực hiện | Dữ liệu & điều kiện bắt buộc | Đến | Thông báo |
 |--|--|--|--|--|--|--|
 | T1 | B1 DRAFT | ☑ Gửi Lãnh đạo | NV cung ứng, Admin | Đủ field; Tổng tiền > 0; 2 file: Phiếu yêu cầu, Báo giá & bảng so sánh giá | B2 | Lãnh đạo |
-| T2 | B1 DRAFT | Hủy đơn | NV cung ứng, Admin | Không cần nhập lý do; hủy xong phải tạo phiếu mới | CANCELLED | — |
+| T2 | B1 DRAFT | Hủy đơn | NV cung ứng, Admin | Không cần nhập lý do; **xóa hẳn phiếu và tệp đính kèm**, không để lại bản ghi | (phiếu biến mất) | — |
 | T3 | B2 LEADER_APPROVAL | ☑ Lãnh đạo duyệt | Lãnh đạo, Admin | Không tự duyệt phiếu mình tạo | B3 | NV cung ứng |
 | T4 | B2 LEADER_APPROVAL | Từ chối | Lãnh đạo, Admin | Comment lý do | REJECTED | NV cung ứng |
 | T5 | B2 LEADER_APPROVAL | Trả lại | Lãnh đạo, Admin | Comment nội dung cần bổ sung | B1 | NV cung ứng |
@@ -168,7 +168,7 @@ Hệ thống chỉ có **một luồng duyệt duy nhất**: TPTC tick duyệt �
 2. Số tiền: Tổng đề nghị > 0; 0 < Tạm ứng ≤ Tổng đề nghị. Ở B6 nhân viên cung ứng nhập **Đã chi thêm** (phần chi ngoài khoản đã tạm ứng), hệ thống tự tính **Còn lại phải chi = Tổng đề nghị − Đã chi thêm − Đã tạm ứng**. Trần của ô nhập là Tổng đề nghị − Đã tạm ứng; vượt trần thì **báo lỗi ngay tại ô nhập ở B6, không cho gửi** (không chuyển Admin), backend trả `ERR_SETTLE_OVER_BUDGET`. Nhập 0 là hợp lệ, nghĩa là không chi thêm đồng nào ngoài khoản tạm ứng. Trong database giá trị này vẫn nằm ở cột `settlement_amount` (giữ tên cũ để không phải đổi hợp đồng API).
 3. Khóa hồ sơ theo bước: file và field chỉ sửa được khi phiếu đang ở đúng bước và chưa tick chốt; mở lại khi bị trả lại hoặc do Admin. Riêng file hóa đơn được bổ sung ở B6, B7, B8.
 4. Trách nhiệm theo phòng ban: mỗi phòng ban chỉ có 1 người, phiếu do người của phòng ban đó tạo và chịu trách nhiệm trên form vận hành của phòng mình. Không áp dụng ràng buộc Tách biệt nhiệm vụ (SoD): hệ thống không chặn trường hợp người duyệt hoặc kế toán được giao trùng người tạo phiếu.
-5. Hủy phiếu: **chỉ có ở B1** (NV cung ứng, không cần nhập lý do; hủy rồi thì tạo phiếu mới). Từ B2 trở đi, sau khi Lãnh đạo đã duyệt, không phòng ban nào được hủy hay cancel phiếu — phiếu đi đủ luồng B1 → B8. Chỉ Lãnh đạo có quyền Từ chối (bắt buộc ghi lý do), Trả lại và Phê duyệt. Đặc quyền A2 của Admin không nằm trong ràng buộc này.
+5. Hủy phiếu: **chỉ có ở B1** (NV cung ứng, không cần nhập lý do). Phiếu ở B1 chưa ai duyệt, chưa phát sinh tiền hay trách nhiệm, nên hủy là **xóa hẳn khỏi hệ thống** cùng mọi tệp đã đính kèm — không để lại phiếu "Đã hủy" làm rác hàng đợi. Nhật ký vẫn ghi để Admin tra được ai hủy. Trạng thái `CANCELLED` chỉ còn phát sinh từ đặc quyền A2 của Admin. Từ B2 trở đi, sau khi Lãnh đạo đã duyệt, không phòng ban nào được hủy hay cancel phiếu — phiếu đi đủ luồng B1 → B8. Chỉ Lãnh đạo có quyền Từ chối (bắt buộc ghi lý do), Trả lại và Phê duyệt. Đặc quyền A2 của Admin không nằm trong ràng buộc này.
 6. B2 không định tuyến theo phòng ban: phiếu đi thẳng Lãnh Đạo, mọi Lãnh đạo đang hoạt động đều duyệt được. Hệ thống không còn tài khoản Lãnh đạo nào hoạt động thì chặn gửi B2 và báo Admin.
 7. Quá hạn B8: scheduler chạy hằng ngày; quá 5 ngày làm việc gắn cờ trễ hạn (không đổi trạng thái), nhắc hằng ngày cho NV CU và kế toán phụ trách. Ngày làm việc theo lịch nghỉ lễ do Admin quản lý.
 8. Độ ưu tiên chọn ở B4 dùng để sắp xếp hàng đợi B5, B7.

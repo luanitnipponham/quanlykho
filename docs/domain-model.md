@@ -44,7 +44,7 @@
 2. `requestedAmount > 0`; `0 < advanceAmount ≤ requestedAmount`; `settlementAmount ≥ advanceAmount` mới qua được T9.
 3. Người duyệt B2 ≠ người tạo phiếu (`ERR_SELF_APPROVAL`). Ngoài B2 không áp dụng tách biệt nhiệm vụ.
 4. T10 luôn kết thúc ở `COMPLETED` hoặc `DOCUMENT_SUPPLEMENT_REQUIRED`; `AUTO_VERIFY` không bao giờ được ghi xuống CSDL.
-5. Hủy phiếu chỉ ở B1 (T2, không cần lý do). Từ B2 trở đi chỉ Lãnh đạo có Từ chối / Trả lại.
+5. Hủy phiếu chỉ ở B1 (T2, không cần lý do) và xóa hẳn phiếu khỏi database. Từ B2 trở đi chỉ Lãnh đạo có Từ chối / Trả lại; `CANCELLED` chỉ còn do A2 của Admin.
 6. Cờ `lateInvoice` không đổi trạng thái phiếu.
 7. **Admin đứng ngoài mọi ràng buộc trạng thái**: A1–A4, sửa dữ liệu, thay file, tick thay và xóa phiếu chạy được ở mọi trạng thái, kể cả COMPLETED. Hệ thống chỉ trả `warning`.
 

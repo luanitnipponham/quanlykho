@@ -229,12 +229,26 @@ describe('B1 and B2', () => {
     assert.match(w.pr.code, /^PYC-202609-\d{4}$/);
   });
 
-  it('T2 cancels at B1 without a reason, and only at B1', () => {
+  it('T2 huy o B1 la xoa han phieu, khong de lai ban ghi "Da huy"', () => {
     const w = new World();
     w.create();
-    w.t(CU, { type: 'CANCEL' });
-    assert.equal(w.pr.status, 'CANCELLED');
+    w.attach(CU, 'REQUEST_FORM');
+    const id = w.id;
+    const code = w.db.requests.find((r) => r.id === id)!.code;
+    assert.equal(w.db.attachments.filter((a) => a.requestId === id).length, 1);
 
+    const res = w.t(CU, { type: 'CANCEL' });
+
+    // Phieu bien mat han, khong con o bat ky trang thai nao.
+    assert.equal(w.db.requests.find((r) => r.id === id), undefined);
+    assert.equal(w.db.requests.length, 0);
+    // Dinh kem bi cuon theo, va id duoc tra ve de xoa file tren dia.
+    assert.equal(w.db.attachments.filter((a) => a.requestId === id).length, 0);
+    assert.equal(res.removedAttachmentIds?.length, 1);
+    // Nhat ky van giu dau vet de Admin tra duoc ai huy.
+    assert.ok(w.db.audit.some((l) => l.action === 'T2' && l.detail.includes(code)));
+
+    // Qua B1 roi thi khong con huy duoc nua.
     const v = new World();
     v.toB3();
     expectCode(() => v.t(CU, { type: 'CANCEL' }), 'ERR_INVALID_TRANSITION');

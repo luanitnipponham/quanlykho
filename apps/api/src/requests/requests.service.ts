@@ -275,12 +275,34 @@ export class RequestsService {
   }
 
   /** T2 — hủy đơn ở B1, không cần lý do (workflow §6.5). */
-  cancel(actor: Actor, id: string, dto: VersionDto) {
-    return this.tx(actor, id, dto.version, 'CANCEL', async (tx, pr) => {
-      await this.move(tx, pr, 'T2', 'CANCELLED', actor.id, null);
-      await this.audit(tx, actor.id, 'T2', 'payment_request', id, `${pr.code}: hủy đơn ở B1`);
-      return { message: 'Đã hủy phiếu. Cần chi thì tạo phiếu mới.' };
+  /**
+   * T2 — hủy ở B1. Phiếu chưa ai duyệt, chưa phát sinh tiền hay trách nhiệm, nên
+   * xóa hẳn thay vì để lại bản ghi "Đã hủy" làm rác hàng đợi của NV cung ứng.
+   * Nhật ký vẫn giữ để Admin tra được ai đã hủy.
+   */
+  async cancel(actor: Actor, id: string, dto: VersionDto) {
+    // Đọc đường dẫn file trước: cascade xóa sạch hàng attachment, sau transaction
+    // không còn cách nào biết file nào thuộc phiếu này.
+    const paths = (
+      await this.prisma.attachment.findMany({ where: { requestId: id }, select: { storagePath: true } })
+    ).map((a) => a.storagePath);
+
+    const result = await this.tx(actor, id, dto.version, 'CANCEL', async (tx, pr) => {
+      await tx.paymentRequest.delete({ where: { id } });
+      await this.audit(
+        tx,
+        actor.id,
+        'T2',
+        'payment_request',
+        id,
+        `${pr.code}: hủy ở B1 — xóa khỏi hệ thống${paths.length ? ` (kèm ${paths.length} file đính kèm)` : ''}`,
+      );
+      return { message: `Đã hủy và xóa phiếu ${pr.code}` };
     });
+
+    // Chỉ đụng ổ đĩa sau khi transaction chắc chắn thành công.
+    removeStoredFiles(paths);
+    return result;
   }
 
   /** T3 — Lãnh đạo duyệt. */
